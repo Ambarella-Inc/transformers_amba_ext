@@ -1,0 +1,219 @@
+diff --git a/lmms_eval/models/llava.py b/lmms_eval/models/llava.py
+--- a/lmms_eval/models/llava.py
++++ b/lmms_eval/models/llava.py
+@@ -24,14 +24,16 @@ warnings.filterwarnings("ignore")
+ from loguru import logger as eval_logger
+
+ try:
+-    from llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+-    from llava.conversation import conv_templates
+-    from llava.mm_utils import (
+-        get_model_name_from_path,
++    from transformers_amba_ext.models.llava.llava.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
++    from transformers_amba_ext.models.llava.llava.conversation import conv_templates
++    from transformers_amba_ext.models.llava.llava.mm_utils import (
+         process_images,
+         tokenizer_image_token,
++        get_model_name_from_path
+     )
+-    from llava.model.builder import load_pretrained_model
++    from transformers import AutoTokenizer, AutoConfig, CLIPImageProcessor
++    from transformers_amba_ext import LlavaLlamaForCausalLM
++    # from llava.model.builder import load_pretrained_model
+ except Exception as e:
+     eval_logger.debug("LLaVA is not installed. Please install LLaVA to use this model.\nError: %s" % e)
+
+@@ -81,8 +83,8 @@ class Llava(lmms):
+             self._device = torch.device(device)
+             self.device_map = device_map
+         else:
+-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
+-            self.device_map = f"cuda:{accelerator.local_process_index}"
++            self._device = "cpu"#torch.device(f"cuda:{accelerator.local_process_index}")
++            self.device_map = "cpu"#f"cuda:{accelerator.local_process_index}"
+
+         llava_model_args = {
+             "multimodal": True,
+@@ -94,17 +96,21 @@ class Llava(lmms):
+         if "use_flash_attention_2" in kwargs:
+             llava_model_args["use_flash_attention_2"] = kwargs["use_flash_attention_2"]
+         model_name = model_name if model_name is not None else get_model_name_from_path(pretrained)
+-        try:
+-            # Try to load the model with the multimodal argument
+-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+-        except TypeError:
+-            # for older versions of LLaVA that don't have multimodal argument
+-            llava_model_args.pop("multimodal", None)
+-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+-        self._config = self._model.config
+-        self.model.eval()
+-        if tie_weights:
+-            self.model.tie_weights()
++        # try:
++        #     # Try to load the model with the multimodal argument
++        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
++        # except TypeError:
++        #     # for older versions of LLaVA that don't have multimodal argument
++        #     llava_model_args.pop("multimodal", None)
++        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
++        self._tokenizer = AutoTokenizer.from_pretrained(pretrained)
++        self._model = LlavaLlamaForCausalLM.from_pretrained(pretrained)
++        self._image_processor = CLIPImageProcessor.from_pretrained(pretrained, do_rescale=False, do_normalize=False)
++        self._config = AutoConfig.from_pretrained(pretrained)
++        self._max_length = self._model.ext_config.max_sequence_length
++        # self.model.eval()
++        # if tie_weights:
++        #     self.model.tie_weights()
+
+         self.truncation = truncation
+         self.batch_size_per_gpu = int(batch_size)
+@@ -367,7 +373,10 @@ class Llava(lmms):
+                 conv.append_message(conv.roles[0], question)
+                 conv.append_message(conv.roles[1], None)
+                 prompt_question = conv.get_prompt()
+-                question_input.append(prompt_question)
++                # Use original context from dataset for model.tokenizer_text_image_token API and the reason as below:
++                # 1: Skip to add image_tokens ("<image>") for original context since it will be added by Shepherd by default
++                # 2: Skip to apply system prompt for original context since it will be applied automatically by shepherd
++                question_input.append(context)
+
+             # input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+             # preconfigure gen_kwargs with defaults
+@@ -381,7 +390,7 @@ class Llava(lmms):
+             if "num_beams" not in gen_kwargs:
+                 gen_kwargs["num_beams"] = 1
+
+-            input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
++            input_ids_list = [self.model.tokenizer_text_image_token(prompt, image_tensor) for prompt in question_input]
+             pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+             input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
+             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+@@ -392,7 +401,6 @@ class Llava(lmms):
+                     input_ids,
+                     attention_mask=attention_masks,
+                     pad_token_id=pad_token_ids,
+-                    images=image_tensor,
+                     image_sizes=gen_kwargs["image_sizes"],
+                     do_sample=True if gen_kwargs["temperature"] > 0 else False,
+                     temperature=gen_kwargs["temperature"],
+diff --git a/lmms_eval/models/llava_onevision.py b/lmms_eval/models/llava_onevision.py
+--- a/lmms_eval/models/llava_onevision.py
++++ b/lmms_eval/models/llava_onevision.py
+@@ -13,7 +13,7 @@ import torch
+ import transformers
+ from accelerate import Accelerator, DistributedType, InitProcessGroupKwargs
+ from accelerate.state import AcceleratorState
+-from decord import VideoReader, cpu
++# from decord import VideoReader, cpu
+ from packaging import version
+ from tqdm import tqdm
+ from transformers import AutoConfig
+@@ -22,7 +22,7 @@ from lmms_eval import utils
+ from lmms_eval.api.instance import Instance
+ from lmms_eval.api.model import lmms
+ from lmms_eval.api.registry import register_model
+-from lmms_eval.models.model_utils.load_video import read_video_pyav
++# from lmms_eval.models.model_utils.load_video import read_video_pyav
+
+ # Suppress warnings
+ warnings.filterwarnings("ignore")
+@@ -35,21 +35,23 @@ torch.backends.cuda.matmul.allow_tf32 = True
+
+ # Import LLaVA modules
+ try:
+-    from llava.constants import (
++    from transformers_amba_ext.models.llava_onevision.llava_next.constants import (
+         DEFAULT_IM_END_TOKEN,
+         DEFAULT_IM_START_TOKEN,
+         DEFAULT_IMAGE_TOKEN,
+         IGNORE_INDEX,
+         IMAGE_TOKEN_INDEX,
+     )
+-    from llava.conversation import SeparatorStyle, conv_templates
+-    from llava.mm_utils import (
++    from transformers_amba_ext.models.llava_onevision.llava_next.conversation import SeparatorStyle, conv_templates
++    from transformers_amba_ext.models.llava_onevision.llava_next.mm_utils import (
+         KeywordsStoppingCriteria,
+         get_model_name_from_path,
+         process_images,
+         tokenizer_image_token,
+     )
+-    from llava.model.builder import load_pretrained_model
++    from transformers_amba_ext.models.llava_onevision.llava_next.siglip_encoder import SigLipImageProcessor
++    from transformers import AutoTokenizer
++    from transformers_amba_ext import LlavaOnevisionForConditionalGeneration
+ except ImportError as e:
+     eval_logger.debug(f"LLaVA is not installed. Please install LLaVA to use this model.\nError: {e}")
+
+@@ -100,8 +102,8 @@ class Llava_OneVision(lmms):
+             self._device = torch.device(device)
+             self.device_map = device_map
+         else:
+-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
+-            self.device_map = f"cuda:{accelerator.local_process_index}"
++            self._device = "cpu"#torch.device(f"cuda:{accelerator.local_process_index}")
++            self.device_map = "cpu"#f"cuda:{accelerator.local_process_index}"
+
+         llava_model_args = {
+             "multimodal": True,
+@@ -127,16 +129,21 @@ class Llava_OneVision(lmms):
+         cfg_pretrained = AutoConfig.from_pretrained(self.pretrained)
+
+         llava_model_args["overwrite_config"] = overwrite_config
+-        try:
+-            # Try to load the model with the multimodal argument
+-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+-        except TypeError:
+-            # for older versions of LLaVA that don't have multimodal argument
+-            llava_model_args.pop("multimodal", None)
+-            self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+-
+-        self._config = self._model.config
+-        self.model.eval()
++        # try:
++        #     # Try to load the model with the multimodal argument
++        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
++        # except TypeError:
++        #     # for older versions of LLaVA that don't have multimodal argument
++        #     llava_model_args.pop("multimodal", None)
++        #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
++
++        self._tokenizer = AutoTokenizer.from_pretrained(pretrained)
++        self._model = LlavaOnevisionForConditionalGeneration.from_pretrained(pretrained)
++        self._image_processor = SigLipImageProcessor(image_mean=[0, 0, 0], image_std=[1, 1, 1], rescale_factor=1)
++        self._config = AutoConfig.from_pretrained(pretrained)
++        self._max_length = self._model.ext_config.max_sequence_length
++        self._config.image_aspect_ratio = "pad"
++        # self.model.eval()
+         self.truncation = truncation
+         self.batch_size_per_gpu = int(batch_size)
+         self.conv_template = conv_template
+@@ -516,7 +523,9 @@ class Llava_OneVision(lmms):
+                     conv.append_message(conv.roles[0], question)
+                     conv.append_message(conv.roles[1], None)
+                     prompt_question = conv.get_prompt()
+-                    question_input.append(prompt_question)
++                    # Skip apply system prompt since the model.tokenizer_text_image_token API will
++                    #   apply system prompt automatically by shepherd library
++                    question_input.append(question)
+
+             # preconfigure gen_kwargs with defaults
+             if "max_new_tokens" not in gen_kwargs:
+@@ -530,7 +539,7 @@ class Llava_OneVision(lmms):
+             if "num_beams" not in gen_kwargs:
+                 gen_kwargs["num_beams"] = 1
+
+-            input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
++            input_ids_list = [self.model.tokenizer_text_image_token(prompt, image_tensor) for prompt in question_input]
+             pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+             input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
+             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
+@@ -552,7 +561,7 @@ class Llava_OneVision(lmms):
+                 gen_kwargs.pop("image_aspect_ratio")
+             try:
+                 with torch.inference_mode():
+-                    cont = self.model.generate(input_ids, attention_mask=attention_masks, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
++                    cont = self.model.generate(input_ids, attention_mask=attention_masks, pad_token_id=pad_token_ids, use_cache=self.use_cache, **gen_kwargs)
+                     # cont = self.model.generate(qwen_input_ids, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
+
+                 text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)

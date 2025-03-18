@@ -1,0 +1,40 @@
+diff --git a/lm_eval/models/huggingface.py b/lm_eval/models/huggingface.py
+--- a/lm_eval/models/huggingface.py
++++ b/lm_eval/models/huggingface.py
+@@ -9,6 +9,7 @@ import jinja2
+ import torch
+ import torch.nn.functional as F
+ import transformers
++import transformers_amba_ext
+ from accelerate import (
+     Accelerator,
+     InitProcessGroupKwargs,
+@@ -417,8 +418,8 @@ class HFLM(TemplateLM):
+             return self._max_length
+         seqlen_config_attrs = ("n_positions", "max_position_embeddings", "n_ctx")
+         for attr in seqlen_config_attrs:
+-            if hasattr(self.model.config, attr):
+-                return getattr(self.model.config, attr)
++            if hasattr(self.model.ext_config, attr):
++                return getattr(self.model.ext_config, attr)
+         if hasattr(self.tokenizer, "model_max_length"):
+             if self.tokenizer.model_max_length == 1000000000000000019884624838656:
+                 return self._DEFAULT_MAX_LENGTH
+@@ -507,7 +508,7 @@ class HFLM(TemplateLM):
+
+         if self.AUTO_MODEL_CLASS is None:
+             if self.backend == "causal":
+-                self.AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
++                self.AUTO_MODEL_CLASS = transformers_amba_ext.AutoModelForCausalLM
+             elif self.backend == "seq2seq":
+                 self.AUTO_MODEL_CLASS = transformers.AutoModelForSeq2SeqLM
+
+@@ -879,7 +880,7 @@ class HFLM(TemplateLM):
+                     input_ids=inps, attention_mask=attn_mask, labels=labels
+                 ).logits
+             else:
+-                assert self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
++                assert self.AUTO_MODEL_CLASS == transformers_amba_ext.AutoModelForCausalLM
+                 return self.model(inps).logits
+
+     def _model_generate(self, context, max_length, stop, **generation_kwargs):

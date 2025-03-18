@@ -1,0 +1,15 @@
+
+__pycache__
+
+build/
+dist/
+*.egg-info
+
+docs/build/
+docs/source/transformers_amba_ext*rst
+docs/source/modules*rst
+docs/source/readme.md
+
+lm-evaluation-harness*
+bigcode-evaluation-harness*
+lmms-eval*

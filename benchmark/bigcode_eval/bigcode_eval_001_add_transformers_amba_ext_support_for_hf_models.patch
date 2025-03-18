@@ -1,0 +1,14 @@
+diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -6,9 +6,9 @@ import warnings
+ import datasets
+ import torch
+ import transformers
++from transformers_amba_ext import AutoModelForCausalLM
+ from accelerate import Accelerator
+ from transformers import (
+-    AutoModelForCausalLM,
+     AutoModelForSeq2SeqLM,
+     AutoTokenizer,
+     HfArgumentParser,

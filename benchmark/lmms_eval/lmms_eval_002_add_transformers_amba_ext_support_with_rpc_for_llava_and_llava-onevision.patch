@@ -1,0 +1,24 @@
+diff --git a/lmms_eval/models/llava.py b/lmms_eval/models/llava.py
+--- a/lmms_eval/models/llava.py
++++ b/lmms_eval/models/llava.py
+@@ -104,7 +104,7 @@ class Llava(lmms):
+         #     llava_model_args.pop("multimodal", None)
+         #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+         self._tokenizer = AutoTokenizer.from_pretrained(pretrained)
+-        self._model = LlavaLlamaForCausalLM.from_pretrained(pretrained)
++        self._model = LlavaLlamaForCausalLM.from_pretrained(pretrained, device_ip="10.4.11.236", device_port=8890)
+         self._image_processor = CLIPImageProcessor.from_pretrained(pretrained, do_rescale=False, do_normalize=False)
+         self._config = AutoConfig.from_pretrained(pretrained)
+         self._max_length = self._model.ext_config.max_sequence_length
+diff --git a/lmms_eval/models/llava_onevision.py b/lmms_eval/models/llava_onevision.py
+--- a/lmms_eval/models/llava_onevision.py
++++ b/lmms_eval/models/llava_onevision.py
+@@ -138,7 +138,7 @@ class Llava_OneVision(lmms):
+         #     self._tokenizer, self._model, self._image_processor, self._max_length = load_pretrained_model(pretrained, None, model_name, device_map=self.device_map, **llava_model_args)
+
+         self._tokenizer = AutoTokenizer.from_pretrained(pretrained)
+-        self._model = LlavaOnevisionForConditionalGeneration.from_pretrained(pretrained)
++        self._model = LlavaOnevisionForConditionalGeneration.from_pretrained(pretrained, device_ip="10.4.11.236", device_port=8890)
+         self._image_processor = SigLipImageProcessor(image_mean=[0, 0, 0], image_std=[1, 1, 1], rescale_factor=1)
+         self._config = AutoConfig.from_pretrained(pretrained)
+         self._max_length = self._model.ext_config.max_sequence_length

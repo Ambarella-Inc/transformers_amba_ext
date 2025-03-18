@@ -1,0 +1,12 @@
+diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -295,6 +295,8 @@ def main():
+         if args.modeltype == "causal":
+             model = AutoModelForCausalLM.from_pretrained(
+                 args.model,
++                device_ip = "10.4.11.236",
++                device_port = 8890,
+                 **model_kwargs,
+             )
+         elif args.modeltype == "seq2seq":

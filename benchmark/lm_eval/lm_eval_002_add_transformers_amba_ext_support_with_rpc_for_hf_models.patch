@@ -1,0 +1,21 @@
+diff --git a/lm_eval/models/huggingface.py b/lm_eval/models/huggingface.py
+--- a/lm_eval/models/huggingface.py
++++ b/lm_eval/models/huggingface.py
+@@ -592,6 +592,8 @@ class HFLM(TemplateLM):
+                 torch_dtype=get_dtype(dtype),
+                 trust_remote_code=trust_remote_code,
+                 gguf_file=gguf_file,
++                device_ip = "10.4.11.236",
++                device_port = 8890,
+                 **model_kwargs,
+             )
+         else:
+@@ -660,6 +662,8 @@ class HFLM(TemplateLM):
+                 revision=revision,
+                 torch_dtype=get_dtype(dtype),
+                 trust_remote_code=trust_remote_code,
++                device_ip = "10.4.11.236",
++                device_port = 8890,
+                 **model_kwargs,
+             )
+             for name, param in self._model.state_dict().items():

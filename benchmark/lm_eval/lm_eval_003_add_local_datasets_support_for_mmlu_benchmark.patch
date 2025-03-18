@@ -1,0 +1,40 @@
+diff --git a/lm_eval/api/task.py b/lm_eval/api/task.py
+--- a/lm_eval/api/task.py
++++ b/lm_eval/api/task.py
+@@ -975,11 +975,17 @@ class ConfigurableTask(Task):
+                 **(self.config.metadata or {}), **(self.config.dataset_kwargs or {})
+             )
+         else:
+-            self.dataset = datasets.load_dataset(
+-                path=self.DATASET_PATH,
+-                name=self.DATASET_NAME,
+-                **dataset_kwargs if dataset_kwargs is not None else {},
+-            )
++            if dataset_kwargs is not None and "load_from_disk" in dataset_kwargs and dataset_kwargs["load_from_disk"]:
++                # using local task in offline environment, need to process the online dataset into local format via
++                # save_to_disk or using dataset_hails_mmlu_save_to_disk.py
++                dataset_kwargs.pop("load_from_disk")
++                self.dataset = datasets.load_from_disk(f"{self.DATASET_PATH}/{self.DATASET_NAME}")
++            else:
++                self.dataset = datasets.load_dataset(
++                    path=self.DATASET_PATH,
++                    name=self.DATASET_NAME,
++                    **dataset_kwargs if dataset_kwargs is not None else {},
++                )
+
+     def has_training_docs(self) -> bool:
+         if self.config.training_split is not None:
+diff --git a/lm_eval/tasks/mmlu/default/_default_template_yaml b/lm_eval/tasks/mmlu/default/_default_template_yaml
+--- a/lm_eval/tasks/mmlu/default/_default_template_yaml
++++ b/lm_eval/tasks/mmlu/default/_default_template_yaml
+@@ -1,4 +1,4 @@
+-dataset_path: hails/mmlu_no_train # a copy of `cais/mmlu` with no auxiliary_train split
++dataset_path: hails_mmlu_no_train # a copy of `cais/mmlu` with no auxiliary_train split
+ test_split: test
+ fewshot_split: dev
+ fewshot_config:
+@@ -15,3 +15,4 @@ metadata:
+   version: 1.0
+ dataset_kwargs:
+   trust_remote_code: true
++  load_from_disk: true
