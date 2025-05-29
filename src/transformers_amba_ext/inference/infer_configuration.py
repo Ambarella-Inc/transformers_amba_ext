@@ -14,7 +14,7 @@ def get_lib_name_for_platform():
 
 	if "aarch64" == os.uname().machine and "Lychee" in os.uname().nodename:
 		ambarella_arch = os.getenv("AMBARELLA_ARCH")
-		lib_name = f"{lib_name}-{ambarella_arch}"
+		lib_name = f"amba-{lib_name}-{ambarella_arch}"
 
 	return lib_name
 
