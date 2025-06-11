@@ -46,13 +46,12 @@ Transformers Ambarella Extension (transformers_amba_ext) package provides below 
 
 
 # 📦Installation
-Use the pip tool to install the wheel package or from the source package.
+Use the pip tool to install the wheel package.
 ```
-# install from source package
+# install the dependencies
 (ubuntu)# pip3 install -r requirements.txt
-(ubuntu)# pip3 install -e .
 
-# install from wheel package
+# build and install wheel package
 (ubuntu)# make build
 (ubuntu)# pip3 install dist/transformers_amba_ext-<version>.<date>-py3-none-any.whl
 ```
@@ -62,6 +61,8 @@ Use the sphinx tool to generate the document from source code package.
 ```
 (ubuntu)# pip3 install sphinx recommonmark sphinx-markdown-tables sphinx_book_theme
 (ubuntu)# make doc
+
+## Then, the user can open `docs/build/html/index.html` in a browser.
 ```
 
 # 🔥Quick start

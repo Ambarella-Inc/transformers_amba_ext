@@ -1,19 +1,7 @@
 import argparse
-import time
 from threading import Thread
 from transformers import AutoTokenizer, TextIteratorStreamer
 from transformers_amba_ext import AutoModelForCausalLM
-
-global Thread_State
-Thread_State = True
-
-def generate_thread(streamer):
-	while Thread_State:
-		if streamer.text_queue.empty():
-			time.sleep(0.01)
-		else:
-			for piece in streamer:
-				print(piece, end="", flush=True)
 
 def llm_chat(args):
 	model_path = args.model_path
@@ -23,10 +11,6 @@ def llm_chat(args):
 		model_path, device_ip=args.ip, device_port=args.port, log_level=args.log_level)
 	tokenizer = AutoTokenizer.from_pretrained(model_path, add_bos_token=False)
 	streamer = TextIteratorStreamer(tokenizer)
-
-	generation_kwargs = dict(streamer=streamer)
-	thread = Thread(target=generate_thread, kwargs=generation_kwargs)
-	thread.start()
 
 	pos = [0]
 	while (1):
@@ -38,8 +22,6 @@ def llm_chat(args):
 			continue
 
 		if (input_string == "EOT") and (len(input_string) == 3):
-			global Thread_State
-			Thread_State = False
 			break
 
 		if (input_string == "RESET") and (len(input_string) == 5):
@@ -49,14 +31,18 @@ def llm_chat(args):
 		print("\n[amba]\n")
 		# Users can also use tokenizer from transformers here to do encode
 		input_ids = model.encode(input_string)
-		model.generate(
+		generation_kwargs = dict(
 			input_ids=input_ids,
 			past_key_values=True,
 			position=pos,
-			do_sample = False if arm_sample == True else None,
-			streamer=streamer)
+			streamer=streamer,
+			do_sample = False if arm_sample == True else None)
+		thread = Thread(target=model.generate, kwargs=generation_kwargs)
+		thread.start()
+		for piece in streamer:
+			print(piece, end="", flush=True)
 
-	thread.join()
+		thread.join()
 
 if __name__=="__main__":
 	parser = argparse.ArgumentParser(description='Text LLM')

@@ -1,20 +1,8 @@
 import argparse
-import time, copy
 import numpy as np
 from threading import Thread
-from transformers import AutoTokenizer, AutoConfig, TextIteratorStreamer
+from transformers import AutoTokenizer, TextIteratorStreamer
 from transformers_amba_ext import LlavaLlamaForCausalLM
-
-global Thread_State
-Thread_State = True
-
-def generate_thread(streamer):
-	while Thread_State:
-		if streamer.text_queue.empty():
-			time.sleep(0.01)
-		else:
-			for piece in streamer:
-				print(piece, end="", flush=True)
 
 def vllm_chat(args):
 	model_path = args.model_path
@@ -25,9 +13,6 @@ def vllm_chat(args):
 		model_path, device_ip=args.ip, device_port=args.port, log_level=args.log_level)
 	tokenizer = AutoTokenizer.from_pretrained(model_path, add_bos_token=False)
 	streamer = TextIteratorStreamer(tokenizer)
-	generation_kwargs = dict(streamer=streamer)
-	thread = Thread(target=generate_thread, kwargs=generation_kwargs)
-	thread.start()
 
 	image_tensor = np.fromfile(image, dtype=np.uint8).reshape(-1, 3, 336, 336)
 	model.tokenizer_image_token(image_tensor)
@@ -42,8 +27,6 @@ def vllm_chat(args):
 			continue
 
 		if (input_string == "EOT") and (len(input_string) == 3):
-			global Thread_State
-			Thread_State = False
 			break
 
 		if (input_string == "RESET") and (len(input_string) == 5):
@@ -53,14 +36,18 @@ def vllm_chat(args):
 		print("\n[amba]\n")
 
 		prompt_ids = model.encode(input_string)
-		model.generate(
+		generation_kwargs = dict(
 			input_ids=prompt_ids,
 			past_key_values=True,
 			position=pos,
-			do_sample = False if arm_sample == True else None,
-			streamer=streamer)
+			streamer=streamer,
+			do_sample = False if arm_sample == True else None)
+		thread = Thread(target=model.generate, kwargs=generation_kwargs)
+		thread.start()
+		for piece in streamer:
+			print(piece, end="", flush=True)
 
-	thread.join()
+		thread.join()
 
 if __name__=="__main__":
 	parser = argparse.ArgumentParser(description='Vision LLM')

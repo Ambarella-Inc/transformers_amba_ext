@@ -9,7 +9,7 @@
 
 ## Apply patch with transformers_amba_ext support for project
 ```
-(Lychee)# git apply ../lmms_eval_001_add_transformers_amba_ext_support_for_llava_and_llava-onevisin.patch
+(Lychee)# git apply ../lmms_eval_001_add_transformers_amba_ext_support_for_llava_and_llava-onevision.patch
 
 
 ## Optional: apply RPC patch if users need to run a model on a remote PC. Users must first check and change the IP address and port number in the patch file below.
@@ -33,6 +33,8 @@ Users can download the lmms-lab/MMBench dataset from [huggingface](https://huggi
 ```
 (Lychee)# pip3 install -e .
 ```
+Note:
+* Users can skip installing the `sentencepiece` package and the `decord` package from `pyproject.toml` if they are also having some installation issues which related those two packages on an aarch64 platform like Lychee.
 
 ## Evaluation
 It is a more recommended solution to do the VQAV2 benchmark on the remote PC because the size of VQAV2 is too large(214K) and the CPU memory on Lychee maybe not enough to load it. Then users can switch to RPC mode if they also meet the memory issue on native Lychee.
@@ -47,7 +49,7 @@ Llava13B only support the single image datasets like MMBench and VQAV2.
 		--output_path output
 ```
 Note:
-* Users need to downlaod `preprocessor_config.json` from [huggingface](https://huggingface.co/openai/clip-vit-large-patch14-336/blob/main/preprocessor_config.json) if encounter an error related to this file
+* Users need to download `preprocessor_config.json` from [huggingface](https://huggingface.co/openai/clip-vit-large-patch14-336/blob/main/preprocessor_config.json) to <model_path> if encounter an error related to this file
 * Users can change tasks name for different dataset like VQAV2.
 * Users can get the reported result from [LMMs-Eval Shared Results](https://docs.google.com/spreadsheets/d/1a5ImfdKATDI8T7Cwh6eH-bEsnQFzanFraFUgcS9KHWc/edit?gid=0#gid=0).
 
