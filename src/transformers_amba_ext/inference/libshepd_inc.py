@@ -2,6 +2,9 @@ import ctypes
 import enum
 
 """
+/*!
+ * @brief The device type
+ */
 typedef enum shepd_device_type_e {
 	SHEPD_DEVICE_LOCAL = 0,  /*!< Local device, default option */
 	SHEPD_DEVICE_REMOTE,     /*!< Remote device via PCIe or Ethernet */
@@ -10,7 +13,11 @@ typedef enum shepd_device_type_e {
 class shepd_device_type_t(enum.IntEnum):
 	SHEPD_DEVICE_LOCAL = 0,
 	SHEPD_DEVICE_REMOTE = 1
+
 """
+/*!
+ * @brief Configuration for Shepherd device initialization
+ */
 struct shepd_device_cfg {
 	IN shepd_device_type_t device_type; /*!< Device type */
 	IN int device_port;                 /*!< Device port ID */
@@ -27,6 +34,9 @@ class shepd_device_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The reset type
+ */
 typedef enum shepd_reset_type_e {
 	RESET_TYPE_HARD = 0, /*!< Reset position to zero and clean last turn conversation */
 	RESET_TYPE_SOFT,     /*!< Reset position to soft reset position
@@ -45,6 +55,9 @@ class shepd_reset_type_t(enum.IntEnum):
 	RESTE_TYPE_LAST = RESET_TYPE_ROLLBACK
 
 """
+/*!
+ * @brief The sampler type
+ */
 typedef enum shepd_sampler_hardware_type_e {
 	SAMPLER_HW_TYPE_ARM = 0, /*!< Perform sampling by arm */
 	SAMPLER_HW_TYPE_NVP,     /*!< Perform sampling by nvp */
@@ -61,6 +74,27 @@ class shepd_sample_hw_t(enum.IntEnum):
 	SAMPLER_TYPE_LAST = SAMPLER_HW_TYPE_NONE
 
 """
+typedef enum shepd_extra_type_e {
+	EXTRA_TYPE_NONE = 0,
+	EXTRA_TYPE_LLAVA,
+	EXTRA_TYPE_LLAVA_ONEVISION,
+	EXTRA_TYPE_VLM,
+	EXTRA_TYPE_FIRST = EXTRA_TYPE_NONE,
+	EXTRA_TYPE_LAST = EXTRA_TYPE_VLM,
+} shepd_extra_type_t;
+"""
+class shepd_extra_type_t(enum.IntEnum):
+	EXTRA_TYPE_NONE = 0
+	EXTRA_TYPE_LLAVA = 1
+	EXTRA_TYPE_LLAVA_ONEVISION = 2
+	EXTRA_TYPE_VLM = 3
+	EXTRA_TYPE_FIRST = EXTRA_TYPE_NONE
+	EXTRA_TYPE_LAST = EXTRA_TYPE_VLM
+
+"""
+/*!
+ * @brief Configuration for Shepherd library initialization
+ */
 struct shepd_init_cfg {
 	IN int log_level;          /*!< Log level */
 	IN uint32_t reserved[63];  /*!< Reserved field */
@@ -73,6 +107,9 @@ class shepd_init_cfg(ctypes.Structure):
 	]
 
 """"
+/*!
+ * @brief The memory description
+ */
 struct shepd_mem {
 	IN void *virt;         /*!< Virtual address */
 	IN unsigned long phys; /*!< Physical address */
@@ -85,7 +122,11 @@ class shepd_mem(ctypes.Structure):
 		("phys", ctypes.c_ulong),
 		("size", ctypes.c_ulong),
 	]
-""""
+
+"""
+/*!
+ * @brief The image dimension description
+ */
 struct shepd_io_dim {
 	unsigned long plane;  /*!< The plane of the port */
 	unsigned long depth;  /*!< The depth of the port */
@@ -123,6 +164,9 @@ class shepd_io_dim(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The image data format description
+ */
 struct shepd_io_data_fmt {
 	uint8_t sign;  /*!< 0: unsigned; 1: sign */
 	uint8_t size;  /*!< 0: 8-bit;  1: 16-bit;  2: 32-bit;  3: 64-bit */
@@ -141,7 +185,11 @@ class shepd_io_data_fmt(ctypes.Structure):
 		("expbits", ctypes.c_uint8),
 		("bitsize", ctypes.c_uint32),
 	]
+
 """
+/*!
+ * @brief The image description
+ */
 struct shepd_img {
 	OUT unsigned long size;          /*!< Image size */
 	OUT struct shepd_io_dim dim;          /*!< The dimension information for the port */
@@ -167,7 +215,11 @@ class shepd_img(ctypes.Structure):
 		("reserved", ctypes.c_uint32 * 31),
 	]
 
+
 """
+/*!
+ * @brief The extra configuration of llava model
+ */
 struct llava_extra {
 	INOUT struct shepd_img vit_in; /*!< Vision transformer net input image information */
 	IN char *vit_net_fn;           /*!< Vision transformer net filename */
@@ -188,6 +240,9 @@ class llava_extra(ctypes.Structure):
 ]
 
 """
+/*!
+ * @brief The llava onevision vit description
+ */
 struct llava_onevision_vit {
 	IN int vit_mode;               /*!< 0: single image, 1: multi image, 2:video */
 	IN uint32_t max_img_num;       /*!< Max image number for multi image and video mode */
@@ -203,12 +258,15 @@ class llava_onevision_vit(ctypes.Structure):
 		("vit_net_fn", ctypes.c_char_p),
 		("vit_in", shepd_img),
 		("reserved", ctypes.c_uint32 * 4),
-]
+	]
 
 """
+/*!
+ * @brief The extra configuration of llava onevision model
+ */
 struct llava_onevision_extra {
 	INOUT struct llava_onevision_vit *vit; /*!< Vit array */
-	IN uint32_t size;                      /*!< Size of vit array*/
+	IN uint32_t size;                      /*!< Size of vit array */
 	IN uint32_t index;                 /*!< Index of vit to run in vit array */
 	IN uint32_t reserved[4];               /*!< Reserved field */
 };
@@ -219,10 +277,70 @@ class llava_onevision_extra(ctypes.Structure):
 		("size", ctypes.c_uint32),
 		("index", ctypes.c_uint32),
 		("reserved", ctypes.c_uint32 * 4),
-]
-
+	]
 
 """
+/*!
+ * @brief The ViT mode for VLMs
+ */
+enum vlm_vit_mode {
+	VLM_VIT_IMAGE = 0,                     /*!< Image mode */
+	VLM_VIT_VIDEO = 1,                     /*!< Video mode */
+	VLM_VIT_MODE_FIRST = VLM_VIT_IMAGE,
+	VLM_VIT_MODE_LAST = VLM_VIT_VIDEO,
+};
+"""
+class vlm_vit_mode(enum.IntEnum):
+	VLM_VIT_IMAGE = 0
+	VLM_VIT_VIDEO = 1
+	VLM_VIT_MODE_FIRST = VLM_VIT_IMAGE
+	VLM_VIT_MODE_LAST = VLM_VIT_VIDEO
+
+"""
+/*!
+ * @brief The ViT description of VLMs
+ */
+struct vlm_vit {
+	IN enum vlm_vit_mode vit_mode;        /*!< Vit mode */
+	IN uint32_t max_img_num;              /*!< Max image number for image and video mode */
+	IN char *vit_net_fn;                  /*!< Vit net filename */
+	INOUT struct shepd_img vit_in;        /*!< Vit input information */
+	IN uint32_t reserved[58];             /*!< Reserved field */
+};
+"""
+class vlm_vit(ctypes.Structure):
+	_fields_ = [
+		("vit_mode", ctypes.c_int),        ## fixme: enum.IntEnum
+		("max_img_num", ctypes.c_uint32),
+		("vit_net_fn", ctypes.c_char_p),
+		("vit_in", shepd_img),
+		("reserved", ctypes.c_uint32 * 58),
+	]
+
+"""
+/*!
+ * @brief The extra configuration of VLMs
+ */
+struct vlm_extra {
+	INOUT struct vlm_vit *vit;            /*!< Vit array */
+	IN uint32_t size;                     /*!< Size of vit array*/
+	IN uint32_t index;                    /*!< Index of vit to run in vit array */
+	IN uint32_t reserved[124];            /*!< Reserved field */
+};
+"""
+class vlm_extra(ctypes.Structure):
+	_fields_ = [
+		("vit", ctypes.c_void_p),         ##fixme: struct vlm_vit * -> void *
+		("size", ctypes.c_uint32),
+		("index", ctypes.c_uint32),
+		("reserved", ctypes.c_uint32 * 124),
+	]
+
+"""
+/*!
+ * @brief The extra configuration of lisa model
+ */
+
 struct lisa_extra {
 	INOUT struct shepd_img vit_in;  /*!< Vision transformer net input image information */
 	INOUT struct shepd_img sam_enc; /*!< Segmentation encoder net input image information */
@@ -253,10 +371,15 @@ class lisa_extra(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The extral configuration of models
+ */
 union shepd_extra {
 	struct llava_extra llava_ex; /*!< Llava extra configuration */
 	struct lisa_extra lisa_ex;   /*!< Lisa extra configuration */
 	struct llava_onevision_extra llava_onevision_ex; /*!< Llava onevision extra configuration */
+	struct vlm_extra vlm_ex; /*!< Generic VLMs extra configuration */
+	uint32_t reserved[1024]; /*!< Reserved field */
 };
 """
 class shepd_extra(ctypes.Union):
@@ -264,9 +387,14 @@ class shepd_extra(ctypes.Union):
 		("llava_ex", llava_extra),
 		("lisa_ex", lisa_extra),
 		("llava_onevision_ex", llava_onevision_extra),
+		("vlm_ex", vlm_extra),
+		("reserved", ctypes.c_uint32 * 1024),
 	]
 
 """
+/*!
+ * @brief The configuration of models
+ */
 struct shepd_config {
 	IN const char *model_path;      /*!< Model path */
 	IN uint32_t batch_size;         /*!< Batch size */
@@ -276,7 +404,15 @@ struct shepd_config {
 	OUT uint32_t max_seq_length;        /*!< Model parameters: max sequence length */
 	OUT uint32_t vocab_size;            /*!< Model parameters: vocabulary size */
 	OUT uint32_t eos_token_id;          /*!< Model parameters: end-of-sequence token id */
-	IN uint32_t reserved[505];          /*!< Reserved field */
+	IN uint32_t query_mem : 1;          /*!< FLag to query CV memory size to run model */
+	IN uint32_t bdec_en : 1;            /*!< FLag to enable batch decode */
+	IN uint32_t share_tokenizer : 1;    /*!< FLag to enable share tokenizer instance for multi-user cases */
+	IN uint32_t reserved_0 : 29;        /*!< Reserved field */
+	OUT unsigned long cv_mem_size;      /*!< CV memory size to run model, unit: byte */
+	IN uint32_t bdec_timeout_us;        /*!< Batch decode timeout time, unit: us */
+	IN uint32_t bdec_thresh_num;        /*!< Batch decode threshold of user number */
+	IN shepd_extra_type_t extra_type;   /*!< Extra type to indicate the type of extra configuration in shepd_ex */
+	IN uint32_t reserved[499];          /*!< Reserved field */
 };
 """
 class shepd_config(ctypes.Structure):
@@ -289,10 +425,21 @@ class shepd_config(ctypes.Structure):
 		("max_seq_length", ctypes.c_uint32),
 		("vocab_size", ctypes.c_uint32),
 		("eos_token_id", ctypes.c_uint32),
-		("reserved", ctypes.c_uint32 * 505),
+		("query_mem", ctypes.c_uint32, 1),
+		("bdec_en", ctypes.c_uint32, 1),
+		("share_tokenizer", ctypes.c_uint32, 1),
+		("reserved_0", ctypes.c_uint32, 29),
+		("cv_mem_size", ctypes.c_ulong),
+		("bdec_timeout_us", ctypes.c_uint32),
+		("bdec_thresh_num", ctypes.c_uint32),
+		("extra_type", ctypes.c_int),
+		("reserved", ctypes.c_uint32 * 499),
 	]
 
 """
+/*!
+ * @brief The configuration of tokenizer encoding
+ */
 struct tokenizer_enc_cfg {
 	IN uint32_t no_sys_prompt : 1; /*!< Don't apply system prompt on input text */
 	IN uint32_t reserved_0 : 31;   /*!< Reserved field */
@@ -307,6 +454,9 @@ class tokenizer_enc_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The configuration of tokenizer decoding
+ */
 struct tokenizer_dec_cfg {
 	IN uint32_t no_piece_mode : 1; /*!< Decoding all token ids one-time, instead of decoding token one by one */
 	IN uint32_t reserved_0 : 31;   /*!< Reserved field */
@@ -321,9 +471,12 @@ class tokenizer_dec_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The tokenizer decoding results
+ */
 struct tokenizer_dec_res {
 	OUT const char *text;  /*!< Decoded text */
-	OUT unsigned long len; /*!< Length of decoded text, null character not included*/
+	OUT unsigned long len; /*!< Length of decoded text, null character not included */
 };
 """
 class tokenizer_dec_res(ctypes.Structure):
@@ -333,6 +486,9 @@ class tokenizer_dec_res(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The token id list
+ */
 struct token_id_list {
 	INOUT uint32_t *ids;       /*!< Token ids */
 	INOUT uint32_t num;        /*!< Token ids num */
@@ -345,6 +501,9 @@ class token_id_list(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The preprocess results
+ */
 struct preproc_res {
 	OUT struct token_id_list id_list;  /*!< Token id list */
 	OUT uint32_t reserved[29];         /*!< Reserved field */
@@ -357,6 +516,9 @@ class preproc_res(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The configuration for run-time change
+ */
 struct shepd_run_cfg {
 	IN float top_p;                   /*!< Top-P */
 	IN float temperature;             /*!< Temperature */
@@ -385,6 +547,9 @@ class shepd_run_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The output description
+ */
 struct shepd_output {
 	OUT uint32_t token_id;     /*!< Output token */
 	OUT uint32_t pos;          /*!< Position in inference context window */
@@ -393,7 +558,9 @@ struct shepd_output {
 	OUT uint32_t logits_elem_size;/*!< Logits element size, return 0 if query_logits_en = 0 */
 	OUT float prefill_time;       /*!< Prefill time, uint: s */
 	OUT float output_time;        /*!< Output one token time, uint: s */
-	OUT uint32_t reserved[120];   /*!< Reserved field */
+	OUT float bdec_time;          /*!< Output one token real time if bdec_en = 1,
+		* it equals to output_time plus the waiting time during batch decoding, uint: s */
+	OUT uint32_t reserved[119];   /*!< Reserved field */
 };
 """
 class shepd_output(ctypes.Structure):
@@ -405,10 +572,14 @@ class shepd_output(ctypes.Structure):
 		("logits_elem_size", ctypes.c_uint32),
 		("prefill_time", ctypes.c_float),
 		("output_time", ctypes.c_float),
-		("reserved", ctypes.c_uint32 * 120),
+		("bdec_time", ctypes.c_float),
+		("reserved", ctypes.c_uint32 * 119),
 	]
 
 """
+/*!
+ * @brief The reset configuration
+ */
 struct shepd_reset_cfg {
 	IN shepd_reset_type_t reset_type; /*!< Reset type */
 	OUT uint32_t reset_pos;   /*!< Reset position in inference context window */
@@ -424,10 +595,13 @@ class shepd_reset_cfg(ctypes.Structure):
 		("reserved", ctypes.c_uint32 * 61),
 	]
 
-""""
+"""
+/*!
+ * @brief The dump type description
+ */
 typedef enum dump_type_e {
-	DUMP_ALL_MODE = 0,       /*!< Dump all layers data and logits*/
-	DUMP_LAYER_MODE,         /*!< Dump a layer's attention and mlp data*/
+	DUMP_ALL_MODE = 0,       /*!< Dump all layers data and logits */
+	DUMP_LAYER_MODE,         /*!< Dump a layer's attention and mlp data */
 	DUMP_LOGITS_MODE,        /*!< Dump logits */
 	DUMP_TYPE_FIRST = DUMP_LAYER_MODE,
 	DUMP_TYPE_LAST = DUMP_LOGITS_MODE,
@@ -440,7 +614,10 @@ class dump_type_t(enum.IntEnum):
 	DUMP_TYPE_FIRST = DUMP_LAYER_MODE
 	DUMP_TYPE_LAST = DUMP_LOGITS_MODE
 
-""""
+"""
+/*!
+ * @brief The performance print type description
+ */
 typedef enum perf_type_e {
 	PERF_LAYER_MODE = 0, /*!< Print performace by layer */
 	PERF_TOKEN_MODE,     /*!< Print performace by token */
@@ -454,7 +631,10 @@ class perf_type_t(enum.IntEnum):
 	PERF_TYPE_FIRST = PERF_LAYER_MODE
 	PERF_TYPE_LAST = PERF_TOKEN_MODE
 
-""""
+"""
+/*!
+ * @brief The dump configuration
+ */
 struct shepd_dump_cfg {
 	dump_type_t dump_type; /*!< Dump type */
 	uint32_t layer_id;     /*!< Layer index, only valid when dump_type equals DUMP_LAYER_MODE */
@@ -469,6 +649,9 @@ class shepd_dump_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The performance print configuration
+ */
 struct shepd_perf_cfg {
 	perf_type_t perf_type; /*!< Performance print type */
 	uint32_t layer_id;     /*!< Layer index */
@@ -483,6 +666,9 @@ class shepd_perf_cfg(ctypes.Structure):
 	]
 
 """
+/*!
+ * @brief The log level shepherd library
+ */
 typedef enum log_e {
 	LOG_ERR = 0,            /*!< Log level error */
 	LOG_WARN,               /*!< Log level warn */
@@ -501,6 +687,9 @@ class log_t(enum.IntEnum):
 	LOG_DEFAULT = LOG_INFO
 
 """
+/*!
+ * @brief The version of shepherd library
+ */
 struct shepherd_version {
 	uint32_t major;       /*!< Version major number */
 	uint32_t minor;       /*!< Version minor number */

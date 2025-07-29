@@ -243,7 +243,7 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 
 		input = self.input_ids_cvt(input_ids)
 		if do_sample is not None:
-			output = super().generate_logits(
+			output = super().generate_logits_until(
 				input_ids = input,
 				position = position,
 				user_id = user_id,
@@ -251,7 +251,7 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 				streamer = streamer,
 				kwargs = kwargs)
 		else:
-			output = super().generate_ids(
+			output = super().generate_ids_until(
 				input_ids = input,
 				position = position,
 				user_id = user_id,

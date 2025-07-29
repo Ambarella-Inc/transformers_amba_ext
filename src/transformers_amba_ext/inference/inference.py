@@ -98,12 +98,15 @@ class inference_runtime(libshepd.libshepd_api):
 
 		if model_type is not None:
 			if model_type == LLAVA_OV_MODEL_TYPE_NAME:
+				shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_LLAVA_ONEVISION
 				self.__infer_model_llava_ov_init()
 			elif model_type == LLAVA_MODEL_TYPE_NAME:
+				shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_LLAVA
 				self.__infer_model_llava_init()
 			else:
 				logger.error(f"Unsupported model type: {model_type}")
 		else:
+			shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_NONE
 			logger.info("No extra config")
 
 		model_handle = super().shepherd_model_create(ctypes.byref(shepd_cfg))

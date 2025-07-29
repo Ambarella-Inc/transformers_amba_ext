@@ -137,7 +137,7 @@ class LlamaForCausalLM(model_base):
 
 		input = self.input_ids_cvt(input_ids)
 		if do_sample is not None:
-			output = super().generate_logits(
+			output = super().generate_logits_until(
 				input_ids = input,
 				position = position,
 				user_id = user_id,
@@ -145,7 +145,7 @@ class LlamaForCausalLM(model_base):
 				streamer = streamer,
 				kwargs = kwargs)
 		else:
-			output = super().generate_ids(
+			output = super().generate_ids_until(
 				input_ids = input,
 				position = position,
 				user_id = user_id,
@@ -164,14 +164,13 @@ class LlamaForCausalLM(model_base):
 	):
 		input = self.input_ids_cvt(input_ids)
 		inplen = input.shape[-1]
+		use_past_key_values = past_key_values if past_key_values is not None else False
 
-		logits = super().generate_logits_once(
-			input_ids = input,
-			position = position,
-			user_id = user_id,
-			past_key_values = past_key_values,
-			streamer = streamer,
-			kwargs = kwargs)
+		logits, pos = super().generate_logits(
+			input_ids = input, user_id = user_id)
+
+		if use_past_key_values == False:
+			pos = self.reset(user_id)
 
 		logits = np.repeat(logits, inplen, axis=0)
 		logits = torch.tensor(logits.reshape(1, inplen, -1), dtype=torch.float32)

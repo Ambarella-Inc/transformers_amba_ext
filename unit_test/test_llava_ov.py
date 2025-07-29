@@ -1,8 +1,16 @@
 import argparse
+import signal
 import numpy as np
 from threading import Thread
 from transformers import AutoTokenizer, TextIteratorStreamer
 from transformers_amba_ext import LlavaOnevisionForConditionalGeneration
+
+run_flag = True
+
+def sigstop(sig, frame):
+	print(f"sigstop msg sig: {sig}")
+	global run_flag
+	run_flag = False
 
 def vllm_chat(args):
 	model_path = args.model_path
@@ -22,7 +30,7 @@ def vllm_chat(args):
 	model.tokenizer_image_token(image_tensor, vit_mode=vit_mode)
 
 	pos = [0]
-	while (1):
+	while run_flag:
 		print("\n\n")
 		print(f"(pos {pos[0]})")
 		print("[user]:\n")
@@ -77,6 +85,10 @@ if __name__=="__main__":
 		default=0,
 		help='Log level for Shepherd. 0: error; 1: warn; 2: info; 3: debug; 4: verbose.')
 	args = parser.parse_args()
+
+	signal.signal(signal.SIGINT, sigstop)
+	signal.signal(signal.SIGQUIT, sigstop)
+	signal.signal(signal.SIGTERM, sigstop)
 
 	vllm_chat(args)
 
