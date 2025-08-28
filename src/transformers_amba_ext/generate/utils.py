@@ -235,13 +235,18 @@ class GenerationMixin():
 					device=device,
 				)
 			)
-		if generation_config.forced_decoder_ids is not None:
-			raise NotImplementedError("Todo")
-			# TODO (sanchit): move this exception to GenerationConfig.validate() when TF & FLAX are aligned with PT
-			raise ValueError(
-				"You have explicitly specified `forced_decoder_ids`. Please remove the `forced_decoder_ids` argument "
-				"in favour of `input_ids` or `decoder_input_ids` respectively.",
-			)
+
+		"""
+		the forced_decoder_ids field was ported from 4.45.0 and removed after transformers>=4.53.0,
+		we can skip this check to ensure it can work with transformers>=4.53.0.
+		"""
+		#if generation_config.forced_decoder_ids is not None:
+		#	raise NotImplementedError("Todo")
+		#	# TODO (sanchit): move this exception to GenerationConfig.validate() when TF & FLAX are aligned with PT
+		#	raise ValueError(
+		#		"You have explicitly specified `forced_decoder_ids`. Please remove the `forced_decoder_ids` argument "
+		#		"in favour of `input_ids` or `decoder_input_ids` respectively.",
+		#	)
 		if generation_config.watermarking_config is not None:
 			raise NotImplementedError("Todo")
 			processors.append(

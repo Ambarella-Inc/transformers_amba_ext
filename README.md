@@ -97,7 +97,7 @@ The verified benckmark are listed as the below, please reference as benckmark fo
 1. Users need to create a soft link from model_desc.json or info/config.json to config.json in the <model_path> for the following issue:
 `ValueError: Unrecognized model in <model_path>. Should have a "model_type" key in its config.json`
 
-2. Users need to create a soft link from from info/tokenizer.json to tokenizer.json in the <model_path> for the following issue:
+2. Users need to create a soft link from info/tokenizer.json to tokenizer.json in the <model_path> for the following issue:
 `OSError: Can't load tokenizer for '<model_path>'. If you were trying to load it from 'https://huggingface.co/models', make sure you don't have a local directory with the same name. Otherwise, make sure '<model_path>' is the correct path to a directory containing all relevant files for a <model_architectures> tokenizer.`
 
 3. How to add a new text model from Shepherd?

@@ -121,7 +121,8 @@ class model_base():
 		input_ids: Union[np.ndarray, torch.Tensor] = None,
 		user_id: Optional[list] = None,
 	):
-		r""" generate next token for current inputs
+		r"""Generate next token for current inputs.
+
 		Args:
 			input_ids (`numpy.ndarray`, `torch.Tensor` of shape `(1, sequence_length)`):
 				Indices of input sequence tokens in the vocabulary.
@@ -219,7 +220,8 @@ class model_base():
 		input_ids: Union[np.ndarray, torch.Tensor] = None,
 		user_id: Optional[list] = None,
 	):
-		r""" generate the logits of next token for current inputs
+		r"""Generate the logits of next token for current inputs.
+
 		Args:
 			input_ids (`numpy.ndarray`, `torch.Tensor` of shape `(1, sequence_length)`):
 				Indices of input sequence tokens in the vocabulary.
