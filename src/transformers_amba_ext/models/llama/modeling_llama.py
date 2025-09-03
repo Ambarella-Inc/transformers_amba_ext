@@ -20,13 +20,15 @@ class LlamaForCausalLM(model_base):
 		device_ip: Optional[str] = None,
 		device_port: Optional[int] = None,
 		log_level: Optional[int] = None,
+		is_embed_model: Optional[bool] = None,
 		**kwargs,
 	):
 		super().__init__(
 			pretrained_model_path = pretrained_model_path,
 			device_ip = device_ip,
 			device_port = device_port,
-			log_level = log_level)
+			log_level = log_level,
+			is_embed_model = is_embed_model)
 
 	@classmethod
 	def from_pretrained(

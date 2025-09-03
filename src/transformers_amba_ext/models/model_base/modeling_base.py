@@ -22,6 +22,7 @@ class model_base():
 		device_port: Optional[int] = None,
 		log_level: Optional[int] = None,
 		model_type: Optional[str] = None,
+		is_embed_model: Optional[bool] = None,
 	):
 		config = inf_config.infer_config(
 			model_path=pretrained_model_path,
@@ -38,7 +39,7 @@ class model_base():
 		self.infer = infer.inference_runtime(config)
 		self.infer.infer_init()
 		self.__infer_version_check(__version__, self.infer.infer_get_version())
-		self.model_handle = self.infer.infer_model_init(model_type)
+		self.model_handle = self.infer.infer_model_init(model_type, is_embed_model)
 
 		self.multi_user_ctx = inf_multi_user.infer_multi_user_ctx(config.max_user_num)
 
@@ -301,6 +302,33 @@ class model_base():
 		logger.debug(f"[generate_logits_until]: "
 			f"user_ctx: user_id: {user_ctx.id}, handle: {user_ctx.handle}, pos: {pos}")
 		return response.astype(np.uint32).reshape(-1)
+
+	def generate_embeddings(self,
+		input_ids: Union[np.ndarray, torch.Tensor] = None,
+		user_id: Optional[list] = None,
+	):
+		r"""Generate the embeddings for current inputs.
+
+		Args:
+			input_ids (`numpy.ndarray`, `torch.Tensor` of shape `(1, sequence_length)`):
+				Indices of input sequence tokens in the vocabulary.
+			user_id (`list`, *optional*):
+				It's an extended configuration for Ambarella chips to index the user ID for current inference.
+				Users need specify this parameters if enable multi user.
+		Returns:
+			embeddings (`numpy.ndarray`): the output embeddings
+		"""
+		ids_num = input_ids.shape[-1]
+		if isinstance(input_ids, torch.Tensor):
+			input_ids = self.input_ids_cvt(input_ids)
+
+		input_ids_ctype = self.infer.infer_input_token_cvt(input_ids.ctypes.data)
+		user_ctx = self.multi_user_get(user_id)
+
+		embeddings = self.infer.infer_user_run_embeddings(
+			self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
+
+		return embeddings
 
 	def reset(
 		self,

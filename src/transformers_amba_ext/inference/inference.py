@@ -85,7 +85,10 @@ class inference_runtime(libshepd.libshepd_api):
 				f"net_fn: {self.llava_ov_vit[i].vit_net_fn}, "
 				f"max_img_num: {self.llava_ov_vit[i].max_img_num}")
 
-	def infer_model_init(self, model_type: Optional[str] = None):
+	def infer_model_init(self,
+		model_type: Optional[str] = None,
+		is_embed_model :Optional[bool] = None
+	):
 		shepd_cfg = self.shepd_cfg
 		shepd_cfg.model_path = ctypes.c_char_p(self.config.model_path.encode('utf-8'))
 		shepd_cfg.batch_size = self.config.batch_size
@@ -108,6 +111,9 @@ class inference_runtime(libshepd.libshepd_api):
 		else:
 			shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_NONE
 			logger.info("No extra config")
+
+		if is_embed_model is not None and is_embed_model == True:
+			shepd_cfg.query_last_hidden = 1
 
 		model_handle = super().shepherd_model_create(ctypes.byref(shepd_cfg))
 		if model_handle is None:
@@ -223,6 +229,20 @@ class inference_runtime(libshepd.libshepd_api):
 		logits_u8_arr = np.ctypeslib.as_array(logits_u8_p, shape = (output.logits_mem_size,))
 		logits_fp16_arr = np.frombuffer(logits_u8_arr.data, np.float16)
 		return logits_fp16_arr.reshape(1, -1).astype(np.float32), output.pos
+
+	def infer_user_run_embeddings(self, model_handle, user_handle, input_ids, ids_num):
+		run_cfg = inc.shepd_run_cfg()
+		output = inc.shepd_output()
+		rval = super().shepherd_user_run_ids(
+			model_handle, user_handle, ctypes.byref(run_cfg), input_ids, ids_num, ctypes.byref(output))
+		if rval < 0:
+			raise ValueError(f"[infer_user_run_embeddings] fail, rval: {rval}")
+
+		embed_u8_p = ctypes.cast(output.last_hidden_virt, ctypes.POINTER(ctypes.c_uint8))
+		embed_u8_arr = np.ctypeslib.as_array(embed_u8_p, shape = (output.last_hidden_mem_size,))
+		embed_fp16_arr = np.frombuffer(embed_u8_arr.data, np.float16)
+		hidden_size_fp16 = output.last_hidden_elem_size // np.float16().itemsize
+		return embed_fp16_arr.reshape(-1, hidden_size_fp16)
 
 	def infer_user_release(self, model_handle, user_handle):
 		rval = super().shepherd_user_release(model_handle, user_handle)

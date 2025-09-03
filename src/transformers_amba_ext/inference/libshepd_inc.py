@@ -144,23 +144,29 @@ struct shepd_io_dim {
 	uint32_t loop_cnt : 16;  /*!< Indicator this port has loop cnt. N = loop_cnt.
 		* port_dram_size will be N*port_size */
 
-	uint32_t reserved_2[10];  /*!< Reserved field */
+	uint32_t dram_bit_pack_mode : 8;  /*!< The dram bit pack mode of the port.  For internal use only */
+	uint32_t reserved_1 : 24;  /*!< Reserved field */
+	unsigned long dplane_pitch; /*!< The pitch of the port in height alignment */
+	uint32_t reserved_2[7];  /*!< Reserved field */
 };
 """
 class shepd_io_dim(ctypes.Structure):
 	_fields_ = [
-		("plane", ctypes.c_long),
-		("depth", ctypes.c_long),
-		("height", ctypes.c_long),
-		("width", ctypes.c_long),
-		("pitch", ctypes.c_long),
+		("plane", ctypes.c_ulong),
+		("depth", ctypes.c_ulong),
+		("height", ctypes.c_ulong),
+		("width", ctypes.c_ulong),
+		("pitch", ctypes.c_ulong),
 		("bitvector", ctypes.c_uint32, 1),
 		("is_variable", ctypes.c_uint32, 1),
 		("is_loop_pair", ctypes.c_uint32, 1),
 		("reserved_0", ctypes.c_uint32, 5),
 		("dram_fmt", ctypes.c_uint32, 8),
 		("loop_cnt", ctypes.c_uint32, 16),
-		("reserved_2", ctypes.c_uint32 * 10),
+		("dram_bit_pack_mode", ctypes.c_uint32, 8),
+		("reserved_1", ctypes.c_uint32, 24),
+		("dplane_pitch", ctypes.c_ulong),
+		("reserved_2", ctypes.c_uint32 * 7),
 	]
 
 """
@@ -286,15 +292,17 @@ class llava_onevision_extra(ctypes.Structure):
 enum vlm_vit_mode {
 	VLM_VIT_IMAGE = 0,                     /*!< Image mode */
 	VLM_VIT_VIDEO = 1,                     /*!< Video mode */
+	VLM_VIT_AUDIO = 2,                     /*!< Audio mode */
 	VLM_VIT_MODE_FIRST = VLM_VIT_IMAGE,
-	VLM_VIT_MODE_LAST = VLM_VIT_VIDEO,
+	VLM_VIT_MODE_LAST = VLM_VIT_AUDIO,
 };
 """
 class vlm_vit_mode(enum.IntEnum):
 	VLM_VIT_IMAGE = 0
 	VLM_VIT_VIDEO = 1
+	VLM_VIT_AUDIO = 2
 	VLM_VIT_MODE_FIRST = VLM_VIT_IMAGE
-	VLM_VIT_MODE_LAST = VLM_VIT_VIDEO
+	VLM_VIT_MODE_LAST = VLM_VIT_AUDIO
 
 """
 /*!
@@ -404,10 +412,12 @@ struct shepd_config {
 	OUT uint32_t max_seq_length;        /*!< Model parameters: max sequence length */
 	OUT uint32_t vocab_size;            /*!< Model parameters: vocabulary size */
 	OUT uint32_t eos_token_id;          /*!< Model parameters: end-of-sequence token id */
-	IN uint32_t query_mem : 1;          /*!< FLag to query CV memory size to run model */
-	IN uint32_t bdec_en : 1;            /*!< FLag to enable batch decode */
-	IN uint32_t share_tokenizer : 1;    /*!< FLag to enable share tokenizer instance for multi-user cases */
-	IN uint32_t reserved_0 : 29;        /*!< Reserved field */
+	IN uint32_t query_mem : 1;          /*!< Flag to query CV memory size to run model */
+	IN uint32_t bdec_en : 1;            /*!< Flag to enable batch decode */
+	IN uint32_t share_tokenizer : 1;    /*!< Flag to enable share tokenizer instance for multi-user cases */
+	IN uint32_t query_last_hidden : 1;  /*!< Flag to query normalized last hidden state,
+		* RMSNorm, LayerNorm, or other normalization methods depending on the model */
+	IN uint32_t reserved_0 : 28;        /*!< Reserved field */
 	OUT unsigned long cv_mem_size;      /*!< CV memory size to run model, unit: byte */
 	IN uint32_t bdec_timeout_us;        /*!< Batch decode timeout time, unit: us */
 	IN uint32_t bdec_thresh_num;        /*!< Batch decode threshold of user number */
@@ -428,7 +438,8 @@ class shepd_config(ctypes.Structure):
 		("query_mem", ctypes.c_uint32, 1),
 		("bdec_en", ctypes.c_uint32, 1),
 		("share_tokenizer", ctypes.c_uint32, 1),
-		("reserved_0", ctypes.c_uint32, 29),
+		("query_last_hidden", ctypes.c_uint32, 1),
+		("reserved_0", ctypes.c_uint32, 28),
 		("cv_mem_size", ctypes.c_ulong),
 		("bdec_timeout_us", ctypes.c_uint32),
 		("bdec_thresh_num", ctypes.c_uint32),
@@ -560,7 +571,10 @@ struct shepd_output {
 	OUT float output_time;        /*!< Output one token time, uint: s */
 	OUT float bdec_time;          /*!< Output one token real time if bdec_en = 1,
 		* it equals to output_time plus the waiting time during batch decoding, uint: s */
-	OUT uint32_t reserved[119];   /*!< Reserved field */
+	OUT const void *last_hidden_virt;  /*!< Last hidden state memory virtual address, return NULL if query_hidden_state = 0 */
+	OUT uint64_t last_hidden_mem_size; /*!< Last hidden state memory size, return 0 if query_hidden_state = 0 */
+	OUT uint32_t last_hidden_elem_size;/*!< Last hidden state element size, return 0 if query_hidden_state = 0 */
+	OUT uint32_t reserved[114];   /*!< Reserved field */
 };
 """
 class shepd_output(ctypes.Structure):
@@ -573,7 +587,10 @@ class shepd_output(ctypes.Structure):
 		("prefill_time", ctypes.c_float),
 		("output_time", ctypes.c_float),
 		("bdec_time", ctypes.c_float),
-		("reserved", ctypes.c_uint32 * 119),
+		("last_hidden_virt", ctypes.c_void_p),
+		("last_hidden_mem_size", ctypes.c_uint64),
+		("last_hidden_elem_size", ctypes.c_uint32),
+		("reserved", ctypes.c_uint32 * 114),
 	]
 
 """

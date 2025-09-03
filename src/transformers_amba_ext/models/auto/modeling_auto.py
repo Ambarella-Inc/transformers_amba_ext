@@ -30,6 +30,7 @@ class AutoModelForCausalLM():
 		device_ip: Optional[str] = None,
 		device_port: Optional[int] = None,
 		log_level: Optional[int] = None,
+		is_embed_model: Optional[bool] = None,
 		**kwargs,
 	):
 		config = AutoConfig.from_pretrained(pretrained_model_path)
@@ -50,4 +51,4 @@ class AutoModelForCausalLM():
 
 		if kwargs:
 			print(f"{cls.__name__}: unsupported kwargs: {kwargs}")
-		return model_class(pretrained_model_path, device_ip, device_port, log_level)
+		return model_class(pretrained_model_path, device_ip, device_port, log_level, is_embed_model)
