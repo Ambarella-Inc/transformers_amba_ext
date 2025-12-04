@@ -10,13 +10,14 @@ class ov_vit_mode(int):
 	VIT_VIDEO_MODE = 2
 
 def get_lib_name_for_platform():
+	ambarella_arch = "n1"
 	lib_name = "shepherd"
 
 	if "aarch64" == os.uname().machine and "Lychee" in os.uname().nodename:
 		ambarella_arch = os.getenv("AMBARELLA_ARCH")
 		lib_name = f"amba-{lib_name}-{ambarella_arch}"
 
-	return lib_name
+	return ambarella_arch, lib_name
 
 
 class infer_config():
@@ -39,7 +40,7 @@ class infer_config():
 		self.lib_log_level = lib_log_level
 		self.pos_margin = 768
 
-		self.lib_name = get_lib_name_for_platform()
+		self.arch, self.lib_name = get_lib_name_for_platform()
 
 		self.max_sequence_length = None
 		self.bos_token_id = None

@@ -68,10 +68,10 @@ Use Sphinx to generate a document from the source code package.
 # 🔥Quick start
 The `transformers_amba_ext` package provides APIs to quickly use pre-trained models on texts or images; it inherits the same "Transformers" model name and rewrites commonly used interfaces such as `from_pretrained` and `generate`. The extended configurations, `device_ip`, `device_port`, `log_level`, and `vit_mode`, are available for the rewritten APIs. In the source package, users can view the introduction and sample code that includes the different model classes such as `LlamaForCausalLM`, `LlavaLlamaForCausalLM`, and `LlavaOnevisionForConditionalGeneration`.
 ```
-From transformers import AutoTokenizer
+from transformers import AutoTokenizer
 # Change to use the LlamaForCausalLM class from the transformers_amba_ext package
-# From transformers import LlamaForCausalLM
-From transformers_amba_ext import LlamaForCausalLM
+# from transformers import LlamaForCausalLM
+from transformers_amba_ext import LlamaForCausalLM
 
 model_path = "/home/lychee/cooper_max_demos/llm_demo/chatllama_7B/"
 model = LlamaForCausalLM.from_pretrained(model_path)

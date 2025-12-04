@@ -197,16 +197,16 @@ class shepd_io_data_fmt(ctypes.Structure):
  * @brief The image description
  */
 struct shepd_img {
-	OUT unsigned long size;          /*!< Image size */
-	OUT struct shepd_io_dim dim;          /*!< The dimension information for the port */
-	OUT struct shepd_io_data_fmt data_fmt;/*!< The data format of the port */
-	IN struct shepd_mem img_mem;     /*!< Image memory description */
-	IN uint32_t internal_cavalry_mem : 1; /*!< 0: The app allocates the cavalry memory and
-		* specifies the physical address and size in img_mem. 1: Shepherd allocate
-		* the cavalry memory, the app specifies virtual address and size in img_mem */
-	IN uint32_t reserved_0 : 31;     /*!< Reserved field */
-	IN uint32_t img_num;             /*!< Image num in img_mem */
-	IN uint32_t reserved[31];        /*!< Reserved field */
+	OUT unsigned long size;                     /*!< Image size */
+	OUT struct shepd_io_dim dim;                /*!< The dimension information for the port */
+	OUT struct shepd_io_data_fmt data_fmt;      /*!< The data format of the port */
+	IN struct shepd_mem img_mem;                /*!< Image memory description */
+	IN uint32_t internal_cavalry_mem : 1;       /*!< 0: The app allocates the cavalry memory and
+		              * specifies the physical address and size in img_mem. 1: Shepherd allocate
+	              * the cavalry memory, the app specifies virtual address and size in img_mem */
+	IN uint32_t reserved_0 : 31;                /*!< Reserved field */
+	IN uint32_t img_num;                        /*!< Image num in img_mem */
+	IN uint32_t reserved[31];                   /*!< Reserved field */
 };
 """
 class shepd_img(ctypes.Structure):

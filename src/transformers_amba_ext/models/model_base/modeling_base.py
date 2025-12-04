@@ -97,6 +97,34 @@ class model_base():
 
 	def encode(self,
 		prompt : str = None,
+		no_sys_prompt: Optional[bool] = None,
+		user_id: Optional[list] = None,
+	):
+		r"""This API will apply default system prompt for input text by Shepherd library and then
+		return the encoded token list. Users can also use the tokenizer from Transformers to do
+		apply_chat_template and encode.
+
+		Args:
+			prompt (`str`):
+				Indices the input text data.
+			no_sys_prompt (`boo;`, *optional*):
+				Apply system prompt or not for input text.
+			user_id (`list`, *optional*):
+				It's an extended configuration for Ambarella chips to index the user ID for current inference.
+				Users need specify this parameters if enable multi user.
+		Returns (`torch.Tensor`):
+			return the encoded token list for input prompt
+		"""
+		no_sys_prompt = no_sys_prompt if no_sys_prompt is not None else False
+
+		user_ctx = self.multi_user_get(user_id)
+		id_list = self.infer.infer_user_encode(
+			self.model_handle, user_ctx.handle, prompt, no_sys_prompt)
+
+		return self.output_ids_cvt(id_list)
+
+	def decode(self,
+		input_ids: torch.Tensor = None,
 		user_id: Optional[list] = None,
 	):
 		r"""This API will apply default system prompt for input text by Shepherd library and then
@@ -112,11 +140,16 @@ class model_base():
 		Returns (`torch.Tensor`):
 			return the encoded token list for input prompt
 		"""
-		user_ctx = self.multi_user_get(user_id)
-		id_list = self.infer.infer_user_encode(
-			self.model_handle, user_ctx.handle, prompt)
+		ids_num = input_ids.shape[-1]
+		if isinstance(input_ids, torch.Tensor):
+			input_ids = self.input_ids_cvt(input_ids)
 
-		return self.output_ids_cvt(id_list)
+		input_ids_ctype = self.infer.infer_input_token_cvt(input_ids.ctypes.data)
+		user_ctx = self.multi_user_get(user_id)
+		text = self.infer.infer_user_decode(
+			self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
+
+		return text
 
 	def generate_id(self,
 		input_ids: Union[np.ndarray, torch.Tensor] = None,

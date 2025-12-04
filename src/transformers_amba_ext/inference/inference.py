@@ -64,17 +64,17 @@ class inference_runtime(libshepd.libshepd_api):
 		self.shepd_cfg.shepd_ex.llava_onevision_ex.size = vit_net_num
 		self.shepd_cfg.shepd_ex.llava_onevision_ex.vit = ctypes.cast(self.llava_ov_vit, ctypes.c_void_p)
 
-		vit_net_path = f"{self.config.model_path}/single_image_preproc_1280x720_n1_cavalry.bin"
+		vit_net_path = f"{self.config.model_path}/single_image_preproc_1280x720_{self.config.arch}_cavalry.bin"
 		self.llava_ov_vit[0].vit_mode = ov_vit_mode.VIT_SINGLE_IMG_MODE
 		self.llava_ov_vit[0].max_img_num = 1
 		self.llava_ov_vit[0].vit_net_fn = ctypes.c_char_p(vit_net_path.encode('utf-8'))
 
-		vit_net_path = f"{self.config.model_path}/multi_image_self_contained_fp16_n1_cavalry.bin"
+		vit_net_path = f"{self.config.model_path}/multi_image_self_contained_fp16_{self.config.arch}_cavalry.bin"
 		self.llava_ov_vit[1].vit_mode = ov_vit_mode.VIT_MULTI_IMG_MODE
 		self.llava_ov_vit[1].max_img_num = 8
 		self.llava_ov_vit[1].vit_net_fn = ctypes.c_char_p(vit_net_path.encode('utf-8'))
 
-		vit_net_path = f"{self.config.model_path}/video_mode_self_contained_fp16_n1_cavalry.bin"
+		vit_net_path = f"{self.config.model_path}/video_mode_self_contained_fp16_{self.config.arch}_cavalry.bin"
 		self.llava_ov_vit[2].vit_mode = ov_vit_mode.VIT_VIDEO_MODE
 		self.llava_ov_vit[2].max_img_num = 16
 		self.llava_ov_vit[2].vit_net_fn = ctypes.c_char_p(vit_net_path.encode('utf-8'))
@@ -146,9 +146,10 @@ class inference_runtime(libshepd.libshepd_api):
 				f"model: {model_handle}, user_ctx: {user_handle}")
 		return user_handle
 
-	def infer_user_encode(self, model_handle, user_handle, input_text):
+	def infer_user_encode(self, model_handle, user_handle, input_text, no_sys_prompt):
 		enc_cfg = inc.tokenizer_enc_cfg()
 		id_list = inc.token_id_list()
+		enc_cfg.no_sys_prompt = no_sys_prompt
 		in_text_ctype = ctypes.c_char_p(input_text.encode('utf-8'))
 		rval = super().shepherd_user_tokenizer_encode(
 			model_handle, user_handle, enc_cfg, in_text_ctype, id_list)
@@ -162,10 +163,22 @@ class inference_runtime(libshepd.libshepd_api):
 
 		return id_list_u32_arr
 
-	def infer_user_decode(self):
-		raise NotImplementedError("Unsupported for now")
+	def infer_user_decode(self, model_handle, user_handle, input_ids, ids_num):
+		dec_cfg = inc.tokenizer_dec_cfg()
+		dec_res = inc.tokenizer_dec_res()
+		dec_cfg.no_piece_mode = 1
+		rval = super().shepherd_user_tokenizer_decode(
+			model_handle, user_handle, dec_cfg, input_ids, ids_num, ctypes.byref(dec_res))
+		if rval < 0:
+			raise ValueError(f"[infer_user_decode] fail, rval: {rval}")
 
-	def infer_user_preprocess(self, model_handle, user_handle, model_type, vit_mode, input_text, img_data, img_num):
+		b_text = dec_res.text[:dec_res.len]
+		text = b_text.decode("utf-8", errors="ignore")
+		return text
+
+	def infer_user_preprocess(self, model_handle, user_handle, model_type, vit_mode,
+		input_text, img_data, img_num
+	):
 		vit_img_data_ctype, vit_img_size = self.__load_vit_img_ctype(img_data)
 
 		if model_type == LLAVA_OV_MODEL_TYPE_NAME:

@@ -114,6 +114,8 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 			return None
 
 		vmode = vit_mode if vit_mode is not None else ov_vit_mode.VIT_MULTI_IMG_MODE
+		prompt = None
+
 		img_tensor = check_image_type(img_tensor, vmode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
@@ -122,7 +124,8 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 
 		num_images = img_tensor.shape[0]
 		self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode, None, img_tensor, num_images)
+			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			prompt, img_tensor, num_images)
 		return None
 
 	def tokenizer_text_image_token(
@@ -163,7 +166,8 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 
 		num_images = img_tensor.shape[0]
 		input_ids = self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode, prompt, img_tensor, num_images)
+			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			prompt, img_tensor, num_images)
 		return self.output_ids_cvt(input_ids)
 
 	def generate(

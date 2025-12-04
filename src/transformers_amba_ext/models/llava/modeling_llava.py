@@ -101,9 +101,12 @@ class LlavaLlamaForCausalLM(model_base):
 		user_ctx = self.multi_user_get(user_id)
 
 		vit_mode = 0
+		prompt = None
+
 		num_images = img_tensor.shape[0]
 		self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vit_mode, None, img_tensor, num_images)
+			self.model_handle, user_ctx.handle, self.model_type, vit_mode,
+			prompt, img_tensor, num_images)
 		return None
 
 	def tokenizer_text_image_token(
@@ -140,7 +143,8 @@ class LlavaLlamaForCausalLM(model_base):
 		vit_mode = 0
 		num_images = img_tensor.shape[0]
 		input_ids = self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vit_mode, prompt, img_tensor, num_images)
+			self.model_handle, user_ctx.handle, self.model_type, vit_mode,
+			prompt, img_tensor, num_images)
 		return self.output_ids_cvt(input_ids)
 
 	def generate(
