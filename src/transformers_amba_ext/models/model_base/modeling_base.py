@@ -44,13 +44,17 @@ class model_base():
 		self.multi_user_ctx = inf_multi_user.infer_multi_user_ctx(config.max_user_num)
 
 	def __del__(self):
-		for i in range(self.multi_user_ctx.get_user_cnt()):
-			user_ctx = self.multi_user_ctx.get_user_ctx_with_index(i)
-			self.infer.infer_user_release(self.model_handle, user_ctx.handle)
-		self.multi_user_ctx.release_all_user()
+		if hasattr(self, 'multi_user_ctx') and self.multi_user_ctx is not None:
+			for i in range(self.multi_user_ctx.get_user_cnt()):
+				user_ctx = self.multi_user_ctx.get_user_ctx_with_index(i)
+				self.infer.infer_user_release(self.model_handle, user_ctx.handle)
+			self.multi_user_ctx.release_all_user()
 
-		self.infer.infer_model_release(self.model_handle)
-		self.infer.infer_exit()
+		if hasattr(self, 'model_handle') and self.model_handle is not None:
+			self.infer.infer_model_release(self.model_handle)
+
+		if hasattr(self, 'infer') and self.infer is not None:
+			self.infer.infer_exit()
 
 	def __infer_version_check(self, ver_infer, ver_shepd):
 		ver_infer_list = ver_infer.split('.')

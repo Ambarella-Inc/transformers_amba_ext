@@ -1,6 +1,6 @@
 
 __version__ = "1.6.1"
-__mod_time__ = "20251209"
+__mod_time__ = "20260106"
 
 _import_structure = {
 	# Models
@@ -13,6 +13,7 @@ _import_structure = {
 	"models.qwen2": ["Qwen2ForCausalLM"],
 	"models.llava": ["LlavaLlamaForCausalLM"],
 	"models.llava_onevision": ["LlavaOnevisionForConditionalGeneration"],
+	"models.vlm": ["VLMForCausalLM"],
 }
 
 from .models.auto import (
@@ -46,3 +47,6 @@ from .models.llava import (
 from .models.llava_onevision import (
 	LlavaOnevisionForConditionalGeneration,
  )
+from .models.vlm import (
+	VLMForCausalLM,
+)

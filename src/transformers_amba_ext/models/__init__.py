@@ -8,5 +8,6 @@ from . import (
 	phi3,
 	qwen2,
 	llava,
-	llava_onevision
+	llava_onevision,
+	vlm
 )

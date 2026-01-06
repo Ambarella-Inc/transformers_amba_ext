@@ -5,8 +5,9 @@ from typing import Dict, Any, Optional
 from ..inference import libshepd as libshepd
 from ..inference import infer_configuration as config
 from ..inference import libshepd_inc as inc
+from ..inference.libshepd_inc import vlm_vit_mode
 from ..inference.infer_configuration import ov_vit_mode
-from ..inference.infer_configuration import LLAVA_OV_MODEL_TYPE_NAME, LLAVA_MODEL_TYPE_NAME
+from ..inference.infer_configuration import LLAVA_OV_MODEL_TYPE_NAME, LLAVA_MODEL_TYPE_NAME, VLM_MODEL_TYPE_NAME
 from ..utils import logging
 
 logger = logging.get_logger(__name__)
@@ -58,6 +59,23 @@ class inference_runtime(libshepd.libshepd_api):
 			f"  img_start_token_id: {self.shepd_cfg.shepd_ex.llava_ex.img_start_token_id}\n"
 			f"  img_end_token_id: {self.shepd_cfg.shepd_ex.llava_ex.img_end_token_id}")
 
+
+	def __infer_model_vlm_init(self):
+		vit_net_num = 1
+		self.vlm_vit = (inc.vlm_vit * vit_net_num)()
+		self.shepd_cfg.shepd_ex.vlm_ex.size = vit_net_num
+		self.shepd_cfg.shepd_ex.vlm_ex.vit = ctypes.cast(self.vlm_vit, ctypes.c_void_p)
+
+		vit_net_path = f"{self.config.model_path}/internvit_cv72_cavalry.bin"
+		self.vlm_vit[0].vit_mode = vlm_vit_mode.VLM_VIT_IMAGE
+		self.vlm_vit[0].max_img_num = 1
+		self.vlm_vit[0].vit_net_fn = ctypes.c_char_p(vit_net_path.encode('utf-8'))
+
+		logger.info(f"VLM: \n"
+			f"  vit_net_fn: {self.vlm_vit[0].vit_net_fn}\n"
+			f"  vit_mode: {self.vlm_vit[0].vit_mode}\n"
+			f"  max_img_num: {self.vlm_vit[0].max_img_num}")
+
 	def __infer_model_llava_ov_init(self):
 		vit_net_num = 3
 		self.llava_ov_vit = (inc.llava_onevision_vit * vit_net_num)()
@@ -106,6 +124,9 @@ class inference_runtime(libshepd.libshepd_api):
 			elif model_type == LLAVA_MODEL_TYPE_NAME:
 				shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_LLAVA
 				self.__infer_model_llava_init()
+			elif model_type == VLM_MODEL_TYPE_NAME:
+				shepd_cfg.extra_type = inc.shepd_extra_type_t.EXTRA_TYPE_VLM
+				self.__infer_model_vlm_init()
 			else:
 				logger.error(f"Unsupported model type: {model_type}")
 		else:
@@ -196,6 +217,14 @@ class inference_runtime(libshepd.libshepd_api):
 			self.shepd_cfg.shepd_ex.llava_ex.vit_in.img_num = img_num
 			self.shepd_cfg.shepd_ex.llava_ex.vit_in.img_mem.size = vit_img_size
 			self.shepd_cfg.shepd_ex.llava_ex.vit_in.img_mem.virt = ctypes.cast(vit_img_data_ctype, ctypes.c_void_p)
+		elif model_type == VLM_MODEL_TYPE_NAME:
+			if vit_mode > vlm_vit_mode.VLM_VIT_AUDIO:
+				raise ValueError(f"unsupported vlm vit mode ({vit_mode})")
+			self.shepd_cfg.shepd_ex.vlm_ex.index = vit_mode
+			self.vlm_vit[vit_mode].vit_in.img_num = img_num
+			self.vlm_vit[vit_mode].vit_in.internal_cavalry_mem = 1
+			self.vlm_vit[vit_mode].vit_in.img_mem.size = vit_img_size
+			self.vlm_vit[vit_mode].vit_in.img_mem.virt = ctypes.cast(vit_img_data_ctype, ctypes.c_void_p)
 		else:
 			logger.error(f"infer_user_preprocess: unsupported model_type: {model_type}")
 

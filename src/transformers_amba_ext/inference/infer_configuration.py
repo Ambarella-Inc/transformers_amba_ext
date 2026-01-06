@@ -3,6 +3,8 @@ import os
 
 LLAVA_MODEL_TYPE_NAME = "llava"
 LLAVA_OV_MODEL_TYPE_NAME = "llava_qwen"
+VLM_MODEL_TYPE_NAME = "vlm"
+
 
 class ov_vit_mode(int):
 	VIT_SINGLE_IMG_MODE = 0
