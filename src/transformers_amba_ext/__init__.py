@@ -1,11 +1,11 @@
 
 __version__ = "1.6.1"
-__mod_time__ = "20260106"
+__mod_time__ = "20260115"
 
 _import_structure = {
 	# Models
     "models": [],
-	"models.auto": ["AutoModelForCausalLM"],
+	"models.auto": ["AutoModelForCausalLM", "AutoModelForVision"],
 	"models.llama": ["LlamaForCausalLM"],
 	"models.gemma": ["GemmaForCausalLM"],
 	"models.gemma2": ["Gemma2ForCausalLM"],
@@ -14,10 +14,13 @@ _import_structure = {
 	"models.llava": ["LlavaLlamaForCausalLM"],
 	"models.llava_onevision": ["LlavaOnevisionForConditionalGeneration"],
 	"models.vlm": ["VLMForCausalLM"],
+	# Inference configuration
+	"inference": ["vit_mode"],
 }
 
 from .models.auto import (
 	AutoModelForCausalLM,
+	AutoModelForVision,
 )
 
 from .models.llama import (
@@ -49,4 +52,9 @@ from .models.llava_onevision import (
  )
 from .models.vlm import (
 	VLMForCausalLM,
+)
+
+# Unified vit_mode for all VLM models
+from .inference.infer_configuration import (
+	vit_mode,
 )

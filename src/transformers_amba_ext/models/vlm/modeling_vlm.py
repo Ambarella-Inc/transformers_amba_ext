@@ -7,17 +7,17 @@ from transformers import TextIteratorStreamer
 from ...utils import logging
 from ..model_base.modeling_base import model_base
 from ...inference.libshepd_inc import vlm_vit_mode
-from ...inference.infer_configuration import VLM_MODEL_TYPE_NAME
+from ...inference.infer_configuration import VLM_MODEL_TYPE_NAME, vit_mode as vit_mode_enum, map_vit_mode_for_vlm
 
 logger = logging.get_logger(__name__)
 
 
-def check_image_type(image_tensor, vit_mode):
+def check_image_type(image_tensor, internal_vit_mode):
 	"""Check and validate the input image tensor for VLM models.
 
 	Args:
 		image_tensor: Input image tensor, should be torch.Tensor or np.ndarray
-		vit_mode: VIT mode (IMAGE, VIDEO, or AUDIO)
+		internal_vit_mode: Internal VLM VIT mode (VLM_VIT_IMAGE, VLM_VIT_VIDEO, or VLM_VIT_AUDIO)
 
 	Returns:
 		Validated image tensor as numpy array, or None if validation fails
@@ -36,22 +36,22 @@ def check_image_type(image_tensor, vit_mode):
 	IMG_N, IMG_C, IMG_H, IMG_W = \
 		image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2], image_tensor.shape[3]
 
-	if vit_mode == vlm_vit_mode.VLM_VIT_IMAGE:
+	if internal_vit_mode == vlm_vit_mode.VLM_VIT_IMAGE:
 		# Image mode validation
 		if IMG_C != 3:
 			logger.error(
-				f"VLM: vit_mode: {vit_mode}, "
+				f"VLM: vit_mode: {internal_vit_mode}, "
 				f"image mode requires 3 channels, "
 				f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
-	elif vit_mode == vlm_vit_mode.VLM_VIT_VIDEO:
+	elif internal_vit_mode == vlm_vit_mode.VLM_VIT_VIDEO:
 		# Video mode is not supported yet
 		raise NotImplementedError("VLM: video mode is not supported yet")
-	elif vit_mode == vlm_vit_mode.VLM_VIT_AUDIO:
+	elif internal_vit_mode == vlm_vit_mode.VLM_VIT_AUDIO:
 		# Audio mode is not supported yet
 		raise NotImplementedError("VLM: audio mode is not supported yet")
 	else:
-		logger.error(f"VLM: unsupported vit mode: {vit_mode}")
+		logger.error(f"VLM: unsupported vit mode: {internal_vit_mode}")
 		return None
 
 	return image_tensor
@@ -125,19 +125,22 @@ class VLMForCausalLM(model_base):
 				Indices the input image data.
 			vit_mode (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the vit mode for vision tower model.
-				0: image; 1: video; 2: audio. Default is image mode.
+				Use unified vit_mode: 0 (SINGLE), 1 (MULTI), 2 (VIDEO), 3 (AUDIO). Default is SINGLE mode.
 			user_id (`list`, *optional*):
 				It's an extended configuration for Ambarella chips to index the user ID for current inference.
 				Users need specify this parameters if enable multi user.
 		"""
+
 		if img_tensor is None:
 			logger.error("tokenizer_image_token: input with img_tensor should not None")
 			return None
 
-		vmode = vit_mode if vit_mode is not None else vlm_vit_mode.VLM_VIT_IMAGE
+		# Use unified vit_mode interface and map to internal VLM mode
+		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
+		internal_mode = map_vit_mode_for_vlm(unified_mode)
 		prompt = None
 
-		img_tensor = check_image_type(img_tensor, vmode)
+		img_tensor = check_image_type(img_tensor, internal_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -145,7 +148,7 @@ class VLMForCausalLM(model_base):
 
 		num_images = img_tensor.shape[0]
 		self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			self.model_handle, user_ctx.handle, self.model_type, internal_mode,
 			prompt, img_tensor, num_images)
 		return None
 
@@ -169,7 +172,7 @@ class VLMForCausalLM(model_base):
 				Indices the input image data.
 			vit_mode (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the vit mode for vision tower model.
-				0: image; 1: video; 2: audio. Default is image mode.
+				Use unified vit_mode: 0 (SINGLE), 1 (MULTI), 2 (VIDEO), 3 (AUDIO). Default is SINGLE mode.
 			user_id (`list`, *optional*):
 				It's an extended configuration for Ambarella chips to index the user ID for current inference.
 				Users need specify this parameters if enable multi user.
@@ -177,12 +180,16 @@ class VLMForCausalLM(model_base):
 		Returns (`torch.Tensor`):
 			return the merged token list include text tokens and image tokens
 		"""
+
 		if prompt is None or img_tensor is None:
 			logger.error("tokenizer_text_image_token: input with prompt and img_tensor should not None")
 			return None
 
-		vmode = vit_mode if vit_mode is not None else vlm_vit_mode.VLM_VIT_IMAGE
-		img_tensor = check_image_type(img_tensor, vmode)
+		# Use unified vit_mode interface and map to internal VLM mode
+		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
+		internal_mode = map_vit_mode_for_vlm(unified_mode)
+
+		img_tensor = check_image_type(img_tensor, internal_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -190,7 +197,7 @@ class VLMForCausalLM(model_base):
 
 		num_images = img_tensor.shape[0]
 		input_ids = self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			self.model_handle, user_ctx.handle, self.model_type, internal_mode,
 			prompt, img_tensor, num_images)
 		return self.output_ids_cvt(input_ids)
 
@@ -236,7 +243,7 @@ class VLMForCausalLM(model_base):
 			import numpy as np
 
 			from transformers import AutoTokenizer
-			from transformers_amba_ext import VLMForCausalLM
+			from transformers_amba_ext import VLMForCausalLM, vit_mode
 
 			# Please replace this path with your actual model artifacts directory
 			model_path = "/path/to/your/vlm_model"
@@ -252,7 +259,8 @@ class VLMForCausalLM(model_base):
 			question = "<image>\nPlease describe this image in detail."
 
 			# Below API will apply system prompt automatically by shepherd library
-			input_ids = model.tokenizer_text_image_token(question, image_tensor)
+			# Use vit_mode.SINGLE for single image, vit_mode.MULTI for multi images
+			input_ids = model.tokenizer_text_image_token(question, image_tensor, vit_mode=vit_mode.SINGLE)
 
 			# Generate response
 			output_ids = model.generate(

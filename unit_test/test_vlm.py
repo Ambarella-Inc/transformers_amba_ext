@@ -3,7 +3,7 @@ import signal
 import numpy as np
 from threading import Thread
 from transformers import AutoTokenizer, TextIteratorStreamer
-from transformers_amba_ext import VLMForCausalLM
+from transformers_amba_ext import VLMForCausalLM, vit_mode
 
 run_flag = True
 
@@ -27,7 +27,7 @@ def vllm_chat(args):
 	model_path = args.model_path
 	arm_sample = args.arm_sample
 	image = args.image
-	vit_mode = args.vit_type
+	vmode = args.vit_type
 
 	model = VLMForCausalLM.from_pretrained(
 		model_path, device_ip=args.ip, device_port=args.port, log_level=args.log_level)
@@ -48,7 +48,7 @@ def vllm_chat(args):
 	except:
 		print("Warning: Could not reshape image to (-1, 3, 448, 448). Using raw input if possible.")
 
-	model.tokenizer_image_token(image_tensor, vit_mode=vit_mode)
+	model.tokenizer_image_token(image_tensor, vit_mode=vmode)
 	pending_image = image_tensor
 	pos = [0]
 	while run_flag:
@@ -92,7 +92,7 @@ if __name__=="__main__":
 		help='Specify the input image binary.')
 	parser.add_argument('-t', '--vit-type', type=int,
 		default=0,
-		help='Specify the vit mode for VLM. 0: image; 1: video; 2: audio.')
+		help='Specify the unified vit mode. 0: SINGLE; 1: MULTI; 2: VIDEO; 3: AUDIO.')
 	parser.add_argument('--ip', type=str,
 		default=None,
 		help='the ip of remote board with RPC mode.')

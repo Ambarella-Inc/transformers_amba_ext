@@ -6,12 +6,21 @@ from transformers import TextIteratorStreamer
 
 from ...utils import logging
 from ..model_base.modeling_base import model_base
-from ...inference.infer_configuration import ov_vit_mode
+from ...inference.infer_configuration import ov_vit_mode, vit_mode, map_vit_mode_for_llava_ov
 from ...inference.infer_configuration import LLAVA_OV_MODEL_TYPE_NAME
 
 logger = logging.get_logger(__name__)
 
-def check_image_type(image_tensor, vit_mode):
+def check_image_type(image_tensor, internal_vit_mode):
+	"""Check and validate the input image tensor.
+
+	Args:
+		image_tensor: Input image tensor
+		internal_vit_mode: Internal ov_vit_mode value
+
+	Returns:
+		Validated image tensor as numpy array, or None if validation fails
+	"""
 	if type(image_tensor) != torch.Tensor and type(image_tensor) != np.ndarray:
 		logger.error("llava-onevision: the type of input images should be torch.Tensor or np.ndarray")
 		return None
@@ -26,22 +35,22 @@ def check_image_type(image_tensor, vit_mode):
 	IMG_N, IMG_C, IMG_H, IMG_W = \
 		image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2], image_tensor.shape[3]
 
-	if vit_mode == ov_vit_mode.VIT_SINGLE_IMG_MODE:
+	if internal_vit_mode == ov_vit_mode.VIT_SINGLE_IMG_MODE:
 		if IMG_N != 1 or IMG_C != 3 or IMG_H != 720 or IMG_W != 1280:
 			logger.error(
-			f"llava-onevision: vit_mode: {vit_mode}, "
+			f"llava-onevision: vit_mode: {internal_vit_mode}, "
 			f"single image mode requires it's resolution 1x3x720x1280, "
 			f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
-	elif vit_mode == ov_vit_mode.VIT_MULTI_IMG_MODE or vit_mode == ov_vit_mode.VIT_VIDEO_MODE:
+	elif internal_vit_mode == ov_vit_mode.VIT_MULTI_IMG_MODE or internal_vit_mode == ov_vit_mode.VIT_VIDEO_MODE:
 		if IMG_C != 3 or IMG_H != 384 or IMG_W != 384:
 			logger.error(
-				f"llava-onevision: vit_mode: {vit_mode}, "
+				f"llava-onevision: vit_mode: {internal_vit_mode}, "
 				f"multi image mode or video mode requires it's resolution Nx3x384x384, "
 				f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
 	else:
-		logger.error("llava-onevision: unsupported vit mode: {vit_mode}")
+		logger.error("llava-onevision: unsupported vit mode: {internal_vit_mode}")
 		return None
 
 	return image_tensor
@@ -104,19 +113,22 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 				Indices the input image data.
 			vit_mode (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the vit mode for vision tower model.
-				0: single image; 1: multi image; 2: video. Default is multi image mode.
+				Use unified vit_mode: 0 (SINGLE), 1 (MULTI), 2 (VIDEO), 3 (AUDIO). Default is MULTI mode.
 			user_id (`list`, *optional*):
 				It's an extended configuration for Ambarella chips to index the user ID for current inference.
 				Users need specify this parameters if enable multi user.
 		"""
+
 		if img_tensor is None:
 			logger.error("tokenizer_image_token: input with img_tensor should not None")
 			return None
 
-		vmode = vit_mode if vit_mode is not None else ov_vit_mode.VIT_MULTI_IMG_MODE
+		# Use unified vit_mode interface and map to internal Llava-OV mode
+		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
+		internal_mode = map_vit_mode_for_llava_ov(unified_mode)
 		prompt = None
 
-		img_tensor = check_image_type(img_tensor, vmode)
+		img_tensor = check_image_type(img_tensor, internal_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -124,7 +136,7 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 
 		num_images = img_tensor.shape[0]
 		self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			self.model_handle, user_ctx.handle, self.model_type, internal_mode,
 			prompt, img_tensor, num_images)
 		return None
 
@@ -146,19 +158,23 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 				Indices the input image data.
 			vit_mode (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the vit mode for vision tower model.
-				0: single image; 1: multi image; 2: video. Default is multi image mode.
+				Use unified vit_mode: 0 (SINGLE), 1 (MULTI), 2 (VIDEO), 3 (AUDIO). Default is MULTI mode.
 			user_id (`list`, *optional*):
 				It's an extended configuration for Ambarella chips to index the user ID for current inference.
 				Users need specify this parameters if enable multi user.
 		Returns (`torch.Tensor`):
 			return the merged token list include text tokens and image tokens
 		"""
+
 		if prompt is None or img_tensor is None:
 			logger.error("tokenizer_text_image_token: input with prompt and img_tensor should not None")
 			return None
 
-		vmode = vit_mode if vit_mode is not None else ov_vit_mode.VIT_MULTI_IMG_MODE
-		img_tensor = check_image_type(img_tensor, vmode)
+		# Use unified vit_mode interface and map to internal Llava-OV mode
+		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
+		internal_mode = map_vit_mode_for_llava_ov(unified_mode)
+
+		img_tensor = check_image_type(img_tensor, internal_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -166,7 +182,7 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 
 		num_images = img_tensor.shape[0]
 		input_ids = self.infer.infer_user_preprocess(
-			self.model_handle, user_ctx.handle, self.model_type, vmode,
+			self.model_handle, user_ctx.handle, self.model_type, internal_mode,
 			prompt, img_tensor, num_images)
 		return self.output_ids_cvt(input_ids)
 
@@ -211,7 +227,7 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 			from PIL import Image
 
 			from transformers import AutoTokenizer, AutoConfig
-			from transformers_amba_ext import LlavaOnevisionForConditionalGeneration
+			from transformers_amba_ext import LlavaOnevisionForConditionalGeneration, vit_mode
 
 			from transformers_amba_ext.models.llava_onevision.llava_next.mm_utils import process_images
 			from transformers_amba_ext.models.llava_onevision.llava_next.siglip_encoder import SigLipImageProcessor
@@ -232,7 +248,8 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 			question = f"<image> This is the first image. Can you describe what you see? Then, let's look at another image: <image> What's the difference between these two images?"
 
 			# Below API will apply system prompt automatically by shepherd library
-			input_ids = model.tokenizer_text_image_token(question, image_tensors)
+			# Use vit_mode.MULTI for multi images
+			input_ids = model.tokenizer_text_image_token(question, image_tensors, vit_mode=vit_mode.MULTI)
 			# Generate response
 			cont = model.generate(
 				input_ids,
