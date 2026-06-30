@@ -6,17 +6,17 @@ from transformers import TextIteratorStreamer
 
 from ...utils import logging
 from ..model_base.modeling_base import model_base
-from ...inference.infer_configuration import ov_vit_mode, vit_mode, map_vit_mode_for_llava_ov
+from ...inference.infer_configuration import vit_mode as vit_mode_enum
 from ...inference.infer_configuration import LLAVA_OV_MODEL_TYPE_NAME
 
 logger = logging.get_logger(__name__)
 
-def check_image_type(image_tensor, internal_vit_mode):
+def check_image_type(image_tensor, unified_vit_mode):
 	"""Check and validate the input image tensor.
 
 	Args:
 		image_tensor: Input image tensor
-		internal_vit_mode: Internal ov_vit_mode value
+		unified_vit_mode: unified ov_vit_mode value
 
 	Returns:
 		Validated image tensor as numpy array, or None if validation fails
@@ -35,22 +35,22 @@ def check_image_type(image_tensor, internal_vit_mode):
 	IMG_N, IMG_C, IMG_H, IMG_W = \
 		image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2], image_tensor.shape[3]
 
-	if internal_vit_mode == ov_vit_mode.VIT_SINGLE_IMG_MODE:
+	if unified_vit_mode == vit_mode_enum.SINGLE:
 		if IMG_N != 1 or IMG_C != 3 or IMG_H != 720 or IMG_W != 1280:
 			logger.error(
-			f"llava-onevision: vit_mode: {internal_vit_mode}, "
+			f"llava-onevision: unified_vit_mode: {unified_vit_mode}, "
 			f"single image mode requires it's resolution 1x3x720x1280, "
 			f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
-	elif internal_vit_mode == ov_vit_mode.VIT_MULTI_IMG_MODE or internal_vit_mode == ov_vit_mode.VIT_VIDEO_MODE:
+	elif unified_vit_mode == vit_mode_enum.MULTI or unified_vit_mode == vit_mode_enum.VIDEO:
 		if IMG_C != 3 or IMG_H != 384 or IMG_W != 384:
 			logger.error(
-				f"llava-onevision: vit_mode: {internal_vit_mode}, "
+				f"llava-onevision: unified_vit_mode: {unified_vit_mode}, "
 				f"multi image mode or video mode requires it's resolution Nx3x384x384, "
 				f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
 	else:
-		logger.error("llava-onevision: unsupported vit mode: {internal_vit_mode}")
+		logger.error("llava-onevision: unsupported vit mode: {unified_vit_mode}")
 		return None
 
 	return image_tensor
@@ -124,11 +124,11 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 			return None
 
 		# Use unified vit_mode interface and map to internal Llava-OV mode
-		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
-		internal_mode = map_vit_mode_for_llava_ov(unified_mode)
+		unified_vit_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
+		internal_mode = self.infer.map_vit_mode_for_llava_ov(unified_vit_mode)
 		prompt = None
 
-		img_tensor = check_image_type(img_tensor, internal_mode)
+		img_tensor = check_image_type(img_tensor, unified_vit_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -171,10 +171,10 @@ class LlavaOnevisionForConditionalGeneration(model_base):
 			return None
 
 		# Use unified vit_mode interface and map to internal Llava-OV mode
-		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
-		internal_mode = map_vit_mode_for_llava_ov(unified_mode)
+		unified_vit_mode = vit_mode if vit_mode is not None else vit_mode_enum.MULTI
+		internal_mode = self.infer.map_vit_mode_for_llava_ov(unified_vit_mode)
 
-		img_tensor = check_image_type(img_tensor, internal_mode)
+		img_tensor = check_image_type(img_tensor, unified_vit_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 

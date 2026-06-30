@@ -3,6 +3,14 @@ import enum
 
 """
 /*!
+ *  @brief define the max batch size
+ */
+#define SHEPD_MAX_BATCH_SIZE        (64)
+"""
+SHEPD_MAX_BATCH_SIZE = 64
+
+"""
+/*!
  * @brief The device type
  */
 typedef enum shepd_device_type_e {

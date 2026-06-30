@@ -52,7 +52,7 @@ Use `pip` to install the wheel package.
 (ubuntu)# pip3 install -r requirements.txt
 
 # Build and install the wheel package
-(ubuntu)# make build
+(ubuntu)# python3 setup.py bdist_wheel
 (ubuntu)# pip3 install dist/transformers_amba_ext-<version>.<date>-py3-none-any.whl
 ```
 
@@ -112,13 +112,13 @@ The verified benckmarks are listed below; users can refer to the benckmark folde
    The Shepherd library supports remote procedure call (RPC) mode, enabling users to run an LLM model on a remote PC. Usage information is available in the Ambarella software developer kit (SDK) documentation. Users can follow the steps below to enable this feature:
    1. Build Shepherd on a PC and export `libshepherd.so` to the system environment by using `source export_lib.env`.
      ```
-     (ubuntu)# `cd ${COOPER_SDK}/ambarella/packages/shepherd/rpc`
-     (ubuntu)# `make`
-     (ubuntu)# `source export_lib.env`
+     (ubuntu)# cd ${COOPER_SDK}/ambarella/packages/shepherd/rpc
+     (ubuntu)# make
+     (ubuntu)# source export_lib.env
      ```
    2. Set up the `shepherd_device_daemon` application on the Ambarella board.
      ```
-     (board)# `shepherd_device_daemon -m /tmp --keep-model --port 8890`
+     (board)# shepherd_device_daemon -m /tmp --keep-model --port 8890
      ```
    3. Set `device_ip=${BOARD_IP}` and `device_port=8890` for the `model.from_pretrained` API, then users can run an LLM model on a remote PC. Users can get an example case with `unit_test/test_chat.py`.
 

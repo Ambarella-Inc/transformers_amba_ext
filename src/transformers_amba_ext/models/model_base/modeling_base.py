@@ -6,15 +6,13 @@ from transformers import TextIteratorStreamer
 
 from ...utils import logging
 from ...generate import utils
-from ...inference import libshepd_inc as inc
 from ...inference import inference as infer
 from ...inference import infer_configuration as inf_config
 from ...inference import infer_multi_user as inf_multi_user
-from ... import __version__
 
 logger = logging.get_logger(__name__)
 
-class model_base():
+class model_base_shepd():
 	def __init__(
 		self,
 		pretrained_model_path: Optional[str] = None,
@@ -23,22 +21,20 @@ class model_base():
 		log_level: Optional[int] = None,
 		model_type: Optional[str] = None,
 		is_embed_model: Optional[bool] = None,
+		backend: Optional[str] = None,
 	):
 		config = inf_config.infer_config(
 			model_path=pretrained_model_path,
-			batch_size = 64,
+			# batch_size = 64,
 			max_user_num = 8,
 			device_ip = device_ip if device_ip is not None else None,
 			device_port = device_port if device_port is not None else None,
-			device_type = inc.shepd_device_type_t.SHEPD_DEVICE_REMOTE \
-				if device_ip is not None or device_port is not None \
-				else inc.shepd_device_type_t.SHEPD_DEVICE_LOCAL,
-			lib_log_level = log_level if log_level is not None else 0)
+			lib_log_level = log_level if log_level is not None else 0,
+			backend = backend if backend is not None else None)
 		self.ext_config = config
 
 		self.infer = infer.inference_runtime(config)
 		self.infer.infer_init()
-		self.__infer_version_check(__version__, self.infer.infer_get_version())
 		self.model_handle = self.infer.infer_model_init(model_type, is_embed_model)
 
 		self.multi_user_ctx = inf_multi_user.infer_multi_user_ctx(config.max_user_num)
@@ -49,25 +45,15 @@ class model_base():
 				user_ctx = self.multi_user_ctx.get_user_ctx_with_index(i)
 				self.infer.infer_user_release(self.model_handle, user_ctx.handle)
 			self.multi_user_ctx.release_all_user()
+			self.multi_user_ctx = None
 
 		if hasattr(self, 'model_handle') and self.model_handle is not None:
 			self.infer.infer_model_release(self.model_handle)
+			self.model_handle = None
 
 		if hasattr(self, 'infer') and self.infer is not None:
 			self.infer.infer_exit()
-
-	def __infer_version_check(self, ver_infer, ver_shepd):
-		ver_infer_list = ver_infer.split('.')
-		ver_shepd_list = ver_shepd.split('.')
-
-		if (ver_infer_list[0] != ver_shepd_list[0]) or (ver_infer_list[1] != ver_shepd_list[1]):
-			raise ValueError(
-				f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-				f"Wrapper API on the transformers_amba_ext package. Version: {ver_infer}\n"
-				f"Shepherd library. Version: {ver_shepd}\n"
-				f"This mismatched version might trigger some unknown issues with incompatibility API.\n"
-				f"Please contact the Ambarella team if you are unsure how to handle it.\n"
-				f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+			self.infer = None
 
 	def __multi_user_creat(self):
 		user_handle = self.infer.infer_user_init(self.model_handle)
@@ -183,6 +169,18 @@ class model_base():
 
 		return token, pos
 
+	def run_eos(
+		self,
+		user_id: Optional[list] = None
+	):
+		user_ctx = self.multi_user_get(user_id)
+
+		eos_token_id = np.array([self.infer.backend_eos_token], dtype=np.int32)
+		eos_ids_ctype = self.infer.infer_input_token_cvt(eos_token_id.ctypes.data)
+		_, pos = self.infer.infer_user_run_ids(
+			self.model_handle, user_ctx.handle, eos_ids_ctype, 1)
+		return pos
+
 	def generate_ids_until(self,
 		input_ids,
 		position: Optional[list] = None,
@@ -214,7 +212,7 @@ class model_base():
 		user_ctx = self.multi_user_get(user_id)
 		max_length = 0
 		last_token_id = 0
-		response = []
+		response = np.array([], dtype=np.uint32)
 
 		kwargs_supported = self.__get_supported_args(**kwargs)
 
@@ -297,7 +295,7 @@ class model_base():
 		token = 0
 		last_token_id = 0
 		max_length = 0
-		response = []
+		response = np.array([], dtype=np.uint32)
 
 		logits_process = utils.GenerationMixin()
 		kwargs_supported = self.__get_supported_args(**kwargs)
@@ -416,3 +414,184 @@ class model_base():
 			logger.warning_once(f"generate supported kwargs: {kwarg}")
 
 		return kwarg
+
+
+class model_base_dist_ai(model_base_shepd):
+	def generate_id(self,
+		input_ids: Union[np.ndarray, torch.Tensor] = None,
+		user_id: Optional[list] = None,
+	):
+		r"""Generate next token for current inputs.
+
+		Args:
+			input_ids (`numpy.ndarray`, `torch.Tensor` of shape `(1, sequence_length)`):
+				Indices of input sequence tokens in the vocabulary.
+			user_id (`list`, *optional*):
+				It's an extended configuration for Ambarella chips to index the user ID for current inference.
+				Users need specify this parameters if enable multi user.
+		Returns:
+			token: the output token id
+			pos: the output position
+		"""
+		ids_num = input_ids.shape[-1]
+		if isinstance(input_ids, torch.Tensor):
+			input_ids = self.input_ids_cvt(input_ids)
+
+		input_ids_ctype = self.infer.infer_input_token_cvt(input_ids.ctypes.data)
+		user_ctx = self.multi_user_get(user_id)
+
+		if ids_num > 1: # prefill
+			self.infer.infer_user_bcast_ids(
+				self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
+
+		token, pos = self.infer.infer_user_run_ids(
+			self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
+
+		return token, pos
+
+	def run_eos(
+		self,
+		user_id: Optional[list] = None
+	):
+		logger.info(f"dist_ai should bypass run_eos")
+		return 0
+
+	def generate_ids_until(self,
+		input_ids,
+		position: Optional[list] = None,
+		user_id: Optional[list] = None,
+		past_key_values: Optional[bool] = None,
+		streamer: Optional[TextIteratorStreamer] = None,
+		kwargs: Dict = None,
+	):
+		r"""
+		Args:
+			input_ids (`torch.LongTensor` of shape `(1, sequence_length)`):
+				Indices of input sequence tokens in the vocabulary.
+			position (`list`, *optional*):
+				Indices to get of position of current conversation, like position=[], default is None.
+			user_id (`list`, *optional*):
+				It's an extended configuration for Ambarella chips to index the user ID for current inference.
+				Users need specify this parameters if enable multi user.
+			past_key_values (`bool`, *optional*):
+				Indices the past conversation can be used for current inference.
+			streamer (`TextIteratorStreamer`, *optional*):
+				Streamer object that will be used to stream the generated sequences. Generated tokens are passed
+				through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
+
+		Returns:
+			`numpy.array`: the array of output token id
+		"""
+		ids_num = input_ids.shape[-1]
+		use_past_key_values = past_key_values if past_key_values is not None else False
+		user_ctx = self.multi_user_get(user_id)
+		max_length = 0
+		response = np.array([], dtype=np.uint32)
+
+		kwargs_supported = self.__get_supported_args(**kwargs)
+		cur_tokens = input_ids
+
+		while True:
+			token, pos = self.generate_id(cur_tokens, user_id)
+
+			max_length = self.__valid_max_length(ids_num, **kwargs_supported)
+			if self.infer.infer_at_eos(token) or self.infer.infer_at_end(pos, max_length):
+				break
+
+			if not self.infer.infer_at_eos(token):
+				response = np.append(response, token)
+				if streamer is not None:
+					streamer.put(np.array([[token]]))
+
+			cur_tokens = np.array([token], dtype=np.int32)
+
+		if streamer is not None:
+			streamer.end()
+
+		if (pos > self.ext_config.max_sequence_length - self.ext_config.pos_margin):
+			logger.warning(f"auto reset since hit pos margin, "
+				f"pos ({pos}) > max_len ({self.ext_config.max_sequence_length}) - margin ({self.ext_config.pos_margin})")
+			pos = self.reset(user_id)
+
+		if use_past_key_values == False:
+			pos = self.reset(user_id)
+
+		self.multi_user_ctx.update_user_pos(user_ctx.id, pos)
+		if position is not None:
+			if position:
+				position[0] = pos
+			else:
+				position.append(pos)
+
+		logger.debug(f"[generate_ids_until]: "
+			f"user_ctx: user_id: {user_ctx.id}, handle: {user_ctx.handle}, pos: {pos}")
+		return response.astype(np.uint32).reshape(-1)
+
+
+class model_base():
+	def __init__(
+		self,
+		pretrained_model_path: Optional[str] = None,
+		device_ip: Optional[str] = None,
+		device_port: Optional[int] = None,
+		log_level: Optional[int] = None,
+		model_type: Optional[str] = None,
+		is_embed_model: Optional[bool] = None,
+		backend: Optional[str] = None,
+	):
+		backend_type = backend if backend is not None else inf_config.backend_type.SHEPD
+		if backend_type == inf_config.backend_type.DIST_AI:
+			model_impl = model_base_dist_ai
+		elif backend_type == inf_config.backend_type.SHEPD:
+			model_impl = model_base_shepd
+		else:
+			raise ValueError(f"Unsupported backend: {backend}")
+
+		self.model_impl = model_impl(
+			pretrained_model_path=pretrained_model_path,
+			device_ip=device_ip,
+			device_port=device_port,
+			log_level=log_level,
+			model_type=model_type,
+			is_embed_model=is_embed_model,
+			backend=backend)
+
+	def __getattr__(self, name):
+		return getattr(self.model_impl, name)
+
+	def __del__(self):
+		if hasattr(self, "model_impl"):
+			del self.model_impl
+
+	def input_ids_cvt(self, *args, **kwargs):
+		return self.model_impl.input_ids_cvt(*args, **kwargs)
+
+	def output_ids_cvt(self, *args, **kwargs):
+		return self.model_impl.output_ids_cvt(*args, **kwargs)
+
+	def encode(self, *args, **kwargs):
+		return self.model_impl.encode(*args, **kwargs)
+
+	def decode(self, *args, **kwargs):
+		return self.model_impl.decode(*args, **kwargs)
+
+	def generate_id(self, *args, **kwargs):
+		return self.model_impl.generate_id(*args, **kwargs)
+
+	def generate_ids_until(self, *args, **kwargs):
+		return self.model_impl.generate_ids_until(*args, **kwargs)
+
+	def generate_logits(self, *args, **kwargs):
+		return self.model_impl.generate_logits(*args, **kwargs)
+
+	def generate_logits_until(self, *args, **kwargs):
+		return self.model_impl.generate_logits_until(*args, **kwargs)
+
+	def generate_embeddings(self, *args, **kwargs):
+		return self.model_impl.generate_embeddings(*args, **kwargs)
+
+	def reset(self, *args, **kwargs):
+		return self.model_impl.reset(*args, **kwargs)
+
+	def run_eos(self, *args, **kwargs):
+		return self.model_impl.run_eos(*args, **kwargs)

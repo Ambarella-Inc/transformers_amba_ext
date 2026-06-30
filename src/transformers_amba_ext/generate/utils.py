@@ -13,13 +13,13 @@ from transformers.generation.logits_process import (
 	ExponentialDecayLengthPenalty,
 	ForcedBOSTokenLogitsProcessor,
 	ForcedEOSTokenLogitsProcessor,
-	HammingDiversityLogitsProcessor,
+	# HammingDiversityLogitsProcessor,
 	InfNanRemoveLogitsProcessor,
 	LogitNormalization,
 	LogitsProcessorList,
-	MinLengthLogitsProcessor,
-	MinNewTokensLengthLogitsProcessor,
-	MinPLogitsWarper,
+	# MinLengthLogitsProcessor,
+	# MinNewTokensLengthLogitsProcessor,
+	# MinPLogitsWarper,
 	NoBadWordsLogitsProcessor,
 	NoRepeatNGramLogitsProcessor,
 	PrefixConstrainedLogitsProcessor,
@@ -293,6 +293,7 @@ class GenerationMixin():
 				)
 			if generation_config.min_p is not None:
 				# Applied after temperature scaling (see https://github.com/ggerganov/llama.cpp/pull/3841#issuecomment-2073826084)
+				raise NotImplementedError("Todo")
 				processors.append(
 					MinPLogitsWarper(min_p=generation_config.min_p, min_tokens_to_keep=min_tokens_to_keep)
 				)

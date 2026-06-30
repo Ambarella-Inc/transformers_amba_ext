@@ -6,18 +6,18 @@ from transformers import TextIteratorStreamer
 
 from ...utils import logging
 from ..model_base.modeling_base import model_base
-from ...inference.libshepd_inc import vlm_vit_mode
-from ...inference.infer_configuration import VLM_MODEL_TYPE_NAME, vit_mode as vit_mode_enum, map_vit_mode_for_vlm
+from ...inference.infer_configuration import (
+	VLM_MODEL_TYPE_NAME, vit_mode as vit_mode_enum)
 
 logger = logging.get_logger(__name__)
 
 
-def check_image_type(image_tensor, internal_vit_mode):
+def check_image_type(image_tensor, unified_vit_mode):
 	"""Check and validate the input image tensor for VLM models.
 
 	Args:
 		image_tensor: Input image tensor, should be torch.Tensor or np.ndarray
-		internal_vit_mode: Internal VLM VIT mode (VLM_VIT_IMAGE, VLM_VIT_VIDEO, or VLM_VIT_AUDIO)
+		unified_vit_mode: unified VLM VIT mode (VLM_VIT_IMAGE, VLM_VIT_VIDEO, or VLM_VIT_AUDIO)
 
 	Returns:
 		Validated image tensor as numpy array, or None if validation fails
@@ -36,22 +36,22 @@ def check_image_type(image_tensor, internal_vit_mode):
 	IMG_N, IMG_C, IMG_H, IMG_W = \
 		image_tensor.shape[0], image_tensor.shape[1], image_tensor.shape[2], image_tensor.shape[3]
 
-	if internal_vit_mode == vlm_vit_mode.VLM_VIT_IMAGE:
+	if unified_vit_mode == vit_mode_enum.SINGLE:
 		# Image mode validation
 		if IMG_C != 3:
 			logger.error(
-				f"VLM: vit_mode: {internal_vit_mode}, "
+				f"VLM: unified_vit_mode: {unified_vit_mode}, "
 				f"image mode requires 3 channels, "
 				f"but current input is: {IMG_N},{IMG_C},{IMG_H},{IMG_W}")
 			return None
-	elif internal_vit_mode == vlm_vit_mode.VLM_VIT_VIDEO:
+	elif unified_vit_mode == vit_mode_enum.VIDEO:
 		# Video mode is not supported yet
 		raise NotImplementedError("VLM: video mode is not supported yet")
-	elif internal_vit_mode == vlm_vit_mode.VLM_VIT_AUDIO:
+	elif unified_vit_mode == vit_mode_enum.AUDIO:
 		# Audio mode is not supported yet
 		raise NotImplementedError("VLM: audio mode is not supported yet")
 	else:
-		logger.error(f"VLM: unsupported vit mode: {internal_vit_mode}")
+		logger.error(f"VLM: unsupported vit mode: {unified_vit_mode}")
 		return None
 
 	return image_tensor
@@ -136,11 +136,11 @@ class VLMForCausalLM(model_base):
 			return None
 
 		# Use unified vit_mode interface and map to internal VLM mode
-		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
-		internal_mode = map_vit_mode_for_vlm(unified_mode)
+		unified_vit_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
+		internal_mode = self.infer.map_vit_mode_for_vlm(unified_vit_mode)
 		prompt = None
 
-		img_tensor = check_image_type(img_tensor, internal_mode)
+		img_tensor = check_image_type(img_tensor, unified_vit_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 
@@ -186,10 +186,10 @@ class VLMForCausalLM(model_base):
 			return None
 
 		# Use unified vit_mode interface and map to internal VLM mode
-		unified_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
-		internal_mode = map_vit_mode_for_vlm(unified_mode)
+		unified_vit_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
+		internal_mode = self.infer.map_vit_mode_for_vlm(unified_vit_mode)
 
-		img_tensor = check_image_type(img_tensor, internal_mode)
+		img_tensor = check_image_type(img_tensor, unified_vit_mode)
 		if img_tensor is None:
 			raise ValueError("check_image_type fail")
 

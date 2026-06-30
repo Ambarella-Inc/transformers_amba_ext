@@ -5,9 +5,11 @@ from ..gemma import GemmaForCausalLM
 from ..gemma2 import Gemma2ForCausalLM
 from ..phi3 import Phi3ForCausalLM
 from ..qwen2 import Qwen2ForCausalLM
+from ..qwen3_moe import Qwen3MoeForCausalLM
 from ..vlm import VLMForCausalLM
 from ..llava import LlavaLlamaForCausalLM
 from ..llava_onevision import LlavaOnevisionForConditionalGeneration
+from ..gpt_oss import GptOssForCausalLM
 
 from ...utils import logging
 
@@ -17,10 +19,14 @@ MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = {
 	"gemma2": Gemma2ForCausalLM,
 	"phi3": Phi3ForCausalLM,
 	"qwen2": Qwen2ForCausalLM,
+	"qwen3": Qwen2ForCausalLM,
+	"gpt_oss": GptOssForCausalLM,
+	"qwen3_moe": Qwen3MoeForCausalLM,
 }
 
 MODEL_FOR_VISION_LM_MAPPING_NAMES = {
 	"internvl_chat": VLMForCausalLM,
+	"qwen3_vl": VLMForCausalLM,
 	"llava": LlavaLlamaForCausalLM,
 	"llava_qwen": LlavaOnevisionForConditionalGeneration,
 	"llava_onevision": LlavaOnevisionForConditionalGeneration,
@@ -43,6 +49,7 @@ class AutoModelForCausalLM():
 		device_port: Optional[int] = None,
 		log_level: Optional[int] = None,
 		is_embed_model: Optional[bool] = None,
+		backend: Optional[str] = None,
 		**kwargs,
 	):
 		config = AutoConfig.from_pretrained(pretrained_model_path, **kwargs)
@@ -64,7 +71,8 @@ class AutoModelForCausalLM():
 
 		if kwargs:
 			print(f"{cls.__name__}: unsupported kwargs: {kwargs}")
-		return model_class(pretrained_model_path, device_ip, device_port, log_level, is_embed_model)
+		return model_class(pretrained_model_path, device_ip, device_port,
+		log_level, is_embed_model, backend=backend)
 
 
 class AutoModelForVision():

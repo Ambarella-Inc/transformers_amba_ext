@@ -9,5 +9,7 @@ from . import (
 	qwen2,
 	llava,
 	llava_onevision,
-	vlm
+	vlm,
+	gpt_oss,
+	qwen3_moe
 )

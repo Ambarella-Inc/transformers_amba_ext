@@ -3,7 +3,7 @@ import signal
 import numpy as np
 from threading import Thread
 from transformers import AutoTokenizer, TextIteratorStreamer
-from transformers_amba_ext import VLMForCausalLM, vit_mode
+from transformers_amba_ext import VLMForCausalLM
 
 run_flag = True
 
@@ -28,28 +28,21 @@ def vllm_chat(args):
 	arm_sample = args.arm_sample
 	image = args.image
 	vmode = args.vit_type
+	IC, IH, IW = map(int, args.ires.split(','))
 
 	model = VLMForCausalLM.from_pretrained(
 		model_path, device_ip=args.ip, device_port=args.port, log_level=args.log_level)
 	tokenizer = AutoTokenizer.from_pretrained(model_path, add_bos_token=False)
 	streamer = TextIteratorStreamer(tokenizer)
 
-	# VLM usually expects images in (N, 3, H, W) format.
-	# Here we load from binary file. Users need to ensure the binary format matches.
-	# For generic VLM, we assume a reasonable default or let the user provide pre-formatted binary.
+	# VLM usually expects images binary with (N, 3, H, W) format.
 	image_tensor = np.fromfile(image, dtype=np.uint8)
-
-	# Note: The exact reshape depends on the model configuration.
-	# For demonstration, we use a placeholder or try to infer.
-	# In actual use, this should match the vision tower input requirements.
-	try:
-		# Example for VLM-Chat-V1.5 or similar often uses 448x448
-		image_tensor = image_tensor.reshape(-1, 3, 448, 448)
-	except:
-		print("Warning: Could not reshape image to (-1, 3, 448, 448). Using raw input if possible.")
+	if image_tensor.size != IC * IH * IW:
+		raise ValueError(f"input image: {image} with {image_tensor.size} Byte "
+			f"!= {IC} x {IH} x {IW}")
+	image_tensor = image_tensor.reshape(-1, IC, IH, IW)
 
 	model.tokenizer_image_token(image_tensor, vit_mode=vmode)
-	pending_image = image_tensor
 	pos = [0]
 	while run_flag:
 		print("\n\n")
@@ -90,6 +83,9 @@ if __name__=="__main__":
 	parser.add_argument('-i', '--image', type=str,
 		default="test_image.bin",
 		help='Specify the input image binary.')
+	parser.add_argument('--ires', type=str,
+		default="3,448,448",
+		help='Specify the resolution (C,H,W) of input image binary.')
 	parser.add_argument('-t', '--vit-type', type=int,
 		default=0,
 		help='Specify the unified vit mode. 0: SINGLE; 1: MULTI; 2: VIDEO; 3: AUDIO.')

@@ -1,10 +1,10 @@
 
-__version__ = "1.6.1"
-__mod_time__ = "20260115"
+__version__ = "1.7.0"
+__mod_time__ = "20260624"
 
 _import_structure = {
 	# Models
-    "models": [],
+	"models": [],
 	"models.auto": ["AutoModelForCausalLM", "AutoModelForVision"],
 	"models.llama": ["LlamaForCausalLM"],
 	"models.gemma": ["GemmaForCausalLM"],
@@ -14,6 +14,8 @@ _import_structure = {
 	"models.llava": ["LlavaLlamaForCausalLM"],
 	"models.llava_onevision": ["LlavaOnevisionForConditionalGeneration"],
 	"models.vlm": ["VLMForCausalLM"],
+	"models.gpt_oss": ["GptOssForCausalLM"],
+	"models.qwen3_moe": ["Qwen3MoeForCausalLM"],
 	# Inference configuration
 	"inference": ["vit_mode"],
 }
@@ -52,6 +54,14 @@ from .models.llava_onevision import (
  )
 from .models.vlm import (
 	VLMForCausalLM,
+)
+
+from .models.gpt_oss import (
+	GptOssForCausalLM,
+)
+
+from .models.qwen3_moe import (
+	Qwen3MoeForCausalLM,
 )
 
 # Unified vit_mode for all VLM models
