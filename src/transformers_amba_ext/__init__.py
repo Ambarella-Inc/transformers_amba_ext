@@ -1,6 +1,6 @@
 
-__version__ = "1.7.0"
-__mod_time__ = "20260624"
+__version__ = "1.7.1"
+__mod_time__ = "20260929"
 
 _import_structure = {
 	# Models

@@ -1,15 +1,15 @@
 import numpy as np
 from typing import Optional
 from ..inference.backend_shepd.backend_shepd import infer_shepd
-from ..inference.backend_dist_ai.backend_dist_ai import infer_dist_ai
+from ..inference.backend_crt.backend_crt import infer_crt
 from ..inference.infer_configuration import backend_type
 
 class inference_runtime():
 	def __init__(self, config):
 		if config.backend == backend_type.SHEPD:
 			self.backend = infer_shepd(config)
-		elif config.backend == backend_type.DIST_AI:
-			self.backend = infer_dist_ai(config)
+		elif config.backend == backend_type.CRT:
+			self.backend = infer_crt(config)
 		else:
 			raise ValueError(f"Unsupported backend: {config.backend}")
 
@@ -53,9 +53,6 @@ class inference_runtime():
 
 	def infer_user_run_ids(self, *args, **kwargs):
 		return self.backend.infer_user_run_ids(*args, **kwargs)
-
-	def infer_user_bcast_ids(self, *args, **kwargs):
-		return self.backend.infer_user_bcast_ids(*args, **kwargs)
 
 	def infer_user_run_logits(self, *args, **kwargs):
 		return self.backend.infer_user_run_logits(*args, **kwargs)

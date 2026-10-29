@@ -36,18 +36,21 @@ def vllm_chat(args):
 	streamer = TextIteratorStreamer(tokenizer)
 
 	# VLM usually expects images binary with (N, 3, H, W) format.
-	image_tensor = np.fromfile(image, dtype=np.uint8)
-	if image_tensor.size != IC * IH * IW:
-		raise ValueError(f"input image: {image} with {image_tensor.size} Byte "
-			f"!= {IC} x {IH} x {IW}")
-	image_tensor = image_tensor.reshape(-1, IC, IH, IW)
-
-	model.tokenizer_image_token(image_tensor, vit_mode=vmode)
+	# Audio mode expects packed fp16 encoder input (see prepare_audio_encoder_input.py).
+	if vmode == 3:
+		audio_tensor = np.fromfile(image, dtype=np.float16)
+		model.tokenizer_image_token(audio_tensor, vit_mode=vmode)
+	else:
+		image_tensor = np.fromfile(image, dtype=np.uint8)
+		if image_tensor.size != IC * IH * IW:
+			raise ValueError(f"input image: {image} with {image_tensor.size} Byte "
+				f"!= {IC} x {IH} x {IW}")
+		image_tensor = image_tensor.reshape(-1, IC, IH, IW)
+		model.tokenizer_image_token(image_tensor, vit_mode=vmode)
 	pos = [0]
 	while run_flag:
 		print("\n\n")
 		print(f"(pos {pos[0]})")
-		print("[user]:\n")
 		input_string = get_user_input()
 		if input_string == "":
 			continue

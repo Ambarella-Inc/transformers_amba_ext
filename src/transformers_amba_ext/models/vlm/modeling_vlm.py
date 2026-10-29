@@ -47,14 +47,36 @@ def check_image_type(image_tensor, unified_vit_mode):
 	elif unified_vit_mode == vit_mode_enum.VIDEO:
 		# Video mode is not supported yet
 		raise NotImplementedError("VLM: video mode is not supported yet")
-	elif unified_vit_mode == vit_mode_enum.AUDIO:
-		# Audio mode is not supported yet
-		raise NotImplementedError("VLM: audio mode is not supported yet")
 	else:
 		logger.error(f"VLM: unsupported vit mode: {unified_vit_mode}")
 		return None
 
 	return image_tensor
+
+
+def check_audio_type(audio_tensor):
+	"""Validate packed audio-encoder input.
+
+	Accepts a 1-D packed blob or 2-D (num_clips, packed_len) array. Dtype is
+	preserved (typically float16 packed waveform + seq_len) so the backend can
+	pass the original bytes to shepherd.
+	"""
+	if type(audio_tensor) != torch.Tensor and type(audio_tensor) != np.ndarray:
+		logger.error("VLM: the type of input audio should be torch.Tensor or np.ndarray")
+		return None
+
+	if isinstance(audio_tensor, torch.Tensor):
+		audio_tensor = audio_tensor.detach().cpu().numpy()
+
+	if audio_tensor.ndim == 1:
+		audio_tensor = audio_tensor.reshape(1, -1)
+	elif audio_tensor.ndim != 2:
+		logger.error(
+			f"VLM: audio input should be 1-D packed blob or 2-D "
+			f"(num_clips, packed_len), got ndim={audio_tensor.ndim}")
+		return None
+
+	return np.ascontiguousarray(audio_tensor)
 
 
 class VLMForCausalLM(model_base):
@@ -70,15 +92,21 @@ class VLMForCausalLM(model_base):
 		pretrained_model_path: str,
 		device_ip: str = None,
 		device_port: int = None,
+		device_id: int = None,
 		log_level: Optional[int] = None,
+		backend: Optional[str] = None,
+		max_img_num: Optional[int] = None,
 	):
 		self.model_type = VLM_MODEL_TYPE_NAME
 		super().__init__(
 			pretrained_model_path = pretrained_model_path,
 			device_ip = device_ip,
 			device_port = device_port,
+			device_id = device_id,
 			log_level = log_level,
-			model_type = self.model_type)
+			model_type = self.model_type,
+			backend = backend,
+			max_img_num = max_img_num)
 
 	@classmethod
 	def from_pretrained(
@@ -86,7 +114,10 @@ class VLMForCausalLM(model_base):
 		pretrained_model_path: Optional[str] = None,
 		device_ip: Optional[str] = None,
 		device_port: Optional[int] = None,
+		device_id: Optional[int] = None,
 		log_level: Optional[int] = None,
+		backend: Optional[str] = None,
+		max_img_num: Optional[int] = None,
 		**kwargs,
 	):
 		r"""Load a pretrained VLM model.
@@ -98,12 +129,21 @@ class VLMForCausalLM(model_base):
 				It's an extended configuration for Ambarella chips to index the IP address if enable RPC mode.
 			device_port (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the port number if enable RPC mode.
+			device_id (`int`, *optional*):
+				libcrt device id when backend=crt (host -> remote X7).
 			log_level (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the log level for Shepherd library.
+			backend (`str`, *optional*):
+				Inference backend: shepherd (local) or crt (libcrt remote).
+			max_img_num (`int`, *optional*):
+				Max image/video-frame/audio-feature num per encoder net
+				(same as test_shepherd_vlm --in N).
 		"""
 		if kwargs:
 			logger.warning(f"{cls.__name__}: unsupported kwargs: {kwargs}")
-		return cls(pretrained_model_path, device_ip, device_port, log_level)
+		return cls(
+			pretrained_model_path, device_ip, device_port, device_id, log_level,
+			backend, max_img_num)
 
 	def __del__(self):
 		super().__del__()
@@ -140,9 +180,14 @@ class VLMForCausalLM(model_base):
 		internal_mode = self.infer.map_vit_mode_for_vlm(unified_vit_mode)
 		prompt = None
 
-		img_tensor = check_image_type(img_tensor, unified_vit_mode)
-		if img_tensor is None:
-			raise ValueError("check_image_type fail")
+		if unified_vit_mode == vit_mode_enum.AUDIO:
+			img_tensor = check_audio_type(img_tensor)
+			if img_tensor is None:
+				raise ValueError("check_audio_type fail")
+		else:
+			img_tensor = check_image_type(img_tensor, unified_vit_mode)
+			if img_tensor is None:
+				raise ValueError("check_image_type fail")
 
 		user_ctx = self.multi_user_get(user_id)
 
@@ -189,9 +234,14 @@ class VLMForCausalLM(model_base):
 		unified_vit_mode = vit_mode if vit_mode is not None else vit_mode_enum.SINGLE
 		internal_mode = self.infer.map_vit_mode_for_vlm(unified_vit_mode)
 
-		img_tensor = check_image_type(img_tensor, unified_vit_mode)
-		if img_tensor is None:
-			raise ValueError("check_image_type fail")
+		if unified_vit_mode == vit_mode_enum.AUDIO:
+			img_tensor = check_audio_type(img_tensor)
+			if img_tensor is None:
+				raise ValueError("check_audio_type fail")
+		else:
+			img_tensor = check_image_type(img_tensor, unified_vit_mode)
+			if img_tensor is None:
+				raise ValueError("check_image_type fail")
 
 		user_ctx = self.multi_user_get(user_id)
 

@@ -22,12 +22,14 @@ class LlamaForCausalLM(model_base):
 		log_level: Optional[int] = None,
 		is_embed_model: Optional[bool] = None,
 		backend: Optional[str] = None,
+		device_id: Optional[int] = None,
 		**kwargs,
 	):
 		super().__init__(
 			pretrained_model_path = pretrained_model_path,
 			device_ip = device_ip,
 			device_port = device_port,
+			device_id = device_id,
 			log_level = log_level,
 			is_embed_model = is_embed_model,
 			backend = backend)
@@ -40,6 +42,7 @@ class LlamaForCausalLM(model_base):
 		device_port: Optional[int] = None,
 		log_level: Optional[int] = None,
 		backend: Optional[str] = None,
+		device_id: Optional[int] = None,
 		**kwargs,
 	):
 		r"""
@@ -53,11 +56,15 @@ class LlamaForCausalLM(model_base):
 			log_level (`int`, *optional*):
 				It's an extended configuration for Ambarella chips to index the log level for Shepherd library.
 			backend (`str`, *optional*):
-				It's an extended configuration for Ambarella chips to index the backend for inference.
+				Inference backend: shepherd (local) or crt (libcrt remote).
+			device_id (`int`, *optional*):
+				libcrt device id when backend=crt.
 		"""
 		if kwargs:
 			logger.warning(f"{cls.__name__}: unsupported kwargs: {kwargs}")
-		return cls(pretrained_model_path, device_ip, device_port, log_level, backend)
+		return cls(
+			pretrained_model_path, device_ip, device_port, log_level,
+			backend=backend, device_id=device_id)
 
 	def __del__(self):
 		super().__del__()

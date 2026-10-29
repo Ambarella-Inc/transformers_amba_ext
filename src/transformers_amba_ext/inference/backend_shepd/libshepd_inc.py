@@ -425,12 +425,14 @@ struct shepd_config {
 	IN uint32_t share_tokenizer : 1;    /*!< Flag to enable share tokenizer instance for multi-user cases */
 	IN uint32_t query_last_hidden : 1;  /*!< Flag to query normalized last hidden state,
 		* RMSNorm, LayerNorm, or other normalization methods depending on the model */
-	IN uint32_t reserved_0 : 28;        /*!< Reserved field */
+	IN uint32_t packed_model : 1;      /*!< 1: use packed_model_mem; 0: load per-file from model_path */
+	IN uint32_t reserved_0 : 27;        /*!< Reserved field */
 	OUT unsigned long cv_mem_size;      /*!< CV memory size to run model, unit: byte */
 	IN uint32_t bdec_timeout_us;        /*!< Batch decode timeout time, unit: us */
 	IN uint32_t bdec_thresh_num;        /*!< Batch decode threshold of user number */
 	IN shepd_extra_type_t extra_type;   /*!< Extra type to indicate the type of extra configuration in shepd_ex */
-	IN uint32_t reserved[499];          /*!< Reserved field */
+	IN struct shepd_mem packed_model_mem; /*!< Packed model blob (weights, ViT nets, and other components). */
+	IN uint32_t reserved[493];          /*!< Reserved field */
 };
 """
 class shepd_config(ctypes.Structure):
@@ -447,12 +449,14 @@ class shepd_config(ctypes.Structure):
 		("bdec_en", ctypes.c_uint32, 1),
 		("share_tokenizer", ctypes.c_uint32, 1),
 		("query_last_hidden", ctypes.c_uint32, 1),
-		("reserved_0", ctypes.c_uint32, 28),
+		("packed_model", ctypes.c_uint32, 1),
+		("reserved_0", ctypes.c_uint32, 27),
 		("cv_mem_size", ctypes.c_ulong),
 		("bdec_timeout_us", ctypes.c_uint32),
 		("bdec_thresh_num", ctypes.c_uint32),
 		("extra_type", ctypes.c_int),
-		("reserved", ctypes.c_uint32 * 499),
+		("packed_model_mem", shepd_mem),
+		("reserved", ctypes.c_uint32 * 493),
 	]
 
 """

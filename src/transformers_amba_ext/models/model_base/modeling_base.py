@@ -416,116 +416,33 @@ class model_base_shepd():
 		return kwarg
 
 
-class model_base_dist_ai(model_base_shepd):
-	def generate_id(self,
-		input_ids: Union[np.ndarray, torch.Tensor] = None,
-		user_id: Optional[list] = None,
-	):
-		r"""Generate next token for current inputs.
+class model_base_crt(model_base_shepd):
+	"""CRT host path: same generate loop as shepherd, device selected by device_id."""
 
-		Args:
-			input_ids (`numpy.ndarray`, `torch.Tensor` of shape `(1, sequence_length)`):
-				Indices of input sequence tokens in the vocabulary.
-			user_id (`list`, *optional*):
-				It's an extended configuration for Ambarella chips to index the user ID for current inference.
-				Users need specify this parameters if enable multi user.
-		Returns:
-			token: the output token id
-			pos: the output position
-		"""
-		ids_num = input_ids.shape[-1]
-		if isinstance(input_ids, torch.Tensor):
-			input_ids = self.input_ids_cvt(input_ids)
-
-		input_ids_ctype = self.infer.infer_input_token_cvt(input_ids.ctypes.data)
-		user_ctx = self.multi_user_get(user_id)
-
-		if ids_num > 1: # prefill
-			self.infer.infer_user_bcast_ids(
-				self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
-
-		token, pos = self.infer.infer_user_run_ids(
-			self.model_handle, user_ctx.handle, input_ids_ctype, ids_num)
-
-		return token, pos
-
-	def run_eos(
+	def __init__(
 		self,
-		user_id: Optional[list] = None
+		pretrained_model_path: Optional[str] = None,
+		device_id: Optional[int] = None,
+		log_level: Optional[int] = None,
+		model_type: Optional[str] = None,
+		is_embed_model: Optional[bool] = None,
+		max_img_num: Optional[int] = None,
+		**kwargs,
 	):
-		logger.info(f"dist_ai should bypass run_eos")
-		return 0
+		config = inf_config.infer_config(
+			model_path=pretrained_model_path,
+			max_user_num=8,
+			device_id=device_id if device_id is not None else 0,
+			lib_log_level=log_level if log_level is not None else 0,
+			backend=inf_config.backend_type.CRT,
+			max_img_num=max_img_num)
+		self.ext_config = config
 
-	def generate_ids_until(self,
-		input_ids,
-		position: Optional[list] = None,
-		user_id: Optional[list] = None,
-		past_key_values: Optional[bool] = None,
-		streamer: Optional[TextIteratorStreamer] = None,
-		kwargs: Dict = None,
-	):
-		r"""
-		Args:
-			input_ids (`torch.LongTensor` of shape `(1, sequence_length)`):
-				Indices of input sequence tokens in the vocabulary.
-			position (`list`, *optional*):
-				Indices to get of position of current conversation, like position=[], default is None.
-			user_id (`list`, *optional*):
-				It's an extended configuration for Ambarella chips to index the user ID for current inference.
-				Users need specify this parameters if enable multi user.
-			past_key_values (`bool`, *optional*):
-				Indices the past conversation can be used for current inference.
-			streamer (`TextIteratorStreamer`, *optional*):
-				Streamer object that will be used to stream the generated sequences. Generated tokens are passed
-				through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
+		self.infer = infer.inference_runtime(config)
+		self.infer.infer_init()
+		self.model_handle = self.infer.infer_model_init(model_type, is_embed_model)
 
-		Returns:
-			`numpy.array`: the array of output token id
-		"""
-		ids_num = input_ids.shape[-1]
-		use_past_key_values = past_key_values if past_key_values is not None else False
-		user_ctx = self.multi_user_get(user_id)
-		max_length = 0
-		response = np.array([], dtype=np.uint32)
-
-		kwargs_supported = self.__get_supported_args(**kwargs)
-		cur_tokens = input_ids
-
-		while True:
-			token, pos = self.generate_id(cur_tokens, user_id)
-
-			max_length = self.__valid_max_length(ids_num, **kwargs_supported)
-			if self.infer.infer_at_eos(token) or self.infer.infer_at_end(pos, max_length):
-				break
-
-			if not self.infer.infer_at_eos(token):
-				response = np.append(response, token)
-				if streamer is not None:
-					streamer.put(np.array([[token]]))
-
-			cur_tokens = np.array([token], dtype=np.int32)
-
-		if streamer is not None:
-			streamer.end()
-
-		if (pos > self.ext_config.max_sequence_length - self.ext_config.pos_margin):
-			logger.warning(f"auto reset since hit pos margin, "
-				f"pos ({pos}) > max_len ({self.ext_config.max_sequence_length}) - margin ({self.ext_config.pos_margin})")
-			pos = self.reset(user_id)
-
-		if use_past_key_values == False:
-			pos = self.reset(user_id)
-
-		self.multi_user_ctx.update_user_pos(user_ctx.id, pos)
-		if position is not None:
-			if position:
-				position[0] = pos
-			else:
-				position.append(pos)
-
-		logger.debug(f"[generate_ids_until]: "
-			f"user_ctx: user_id: {user_ctx.id}, handle: {user_ctx.handle}, pos: {pos}")
-		return response.astype(np.uint32).reshape(-1)
+		self.multi_user_ctx = inf_multi_user.infer_multi_user_ctx(config.max_user_num)
 
 
 class model_base():
@@ -534,27 +451,33 @@ class model_base():
 		pretrained_model_path: Optional[str] = None,
 		device_ip: Optional[str] = None,
 		device_port: Optional[int] = None,
+		device_id: Optional[int] = None,
 		log_level: Optional[int] = None,
 		model_type: Optional[str] = None,
 		is_embed_model: Optional[bool] = None,
 		backend: Optional[str] = None,
+		max_img_num: Optional[int] = None,
 	):
 		backend_type = backend if backend is not None else inf_config.backend_type.SHEPD
-		if backend_type == inf_config.backend_type.DIST_AI:
-			model_impl = model_base_dist_ai
-		elif backend_type == inf_config.backend_type.SHEPD:
-			model_impl = model_base_shepd
+		if backend_type == inf_config.backend_type.SHEPD:
+			self.model_impl = model_base_shepd(
+				pretrained_model_path=pretrained_model_path,
+				device_ip=device_ip,
+				device_port=device_port,
+				log_level=log_level,
+				model_type=model_type,
+				is_embed_model=is_embed_model,
+				backend=backend)
+		elif backend_type == inf_config.backend_type.CRT:
+			self.model_impl = model_base_crt(
+				pretrained_model_path=pretrained_model_path,
+				device_id=device_id,
+				log_level=log_level,
+				model_type=model_type,
+				is_embed_model=is_embed_model,
+				max_img_num=max_img_num)
 		else:
 			raise ValueError(f"Unsupported backend: {backend}")
-
-		self.model_impl = model_impl(
-			pretrained_model_path=pretrained_model_path,
-			device_ip=device_ip,
-			device_port=device_port,
-			log_level=log_level,
-			model_type=model_type,
-			is_embed_model=is_embed_model,
-			backend=backend)
 
 	def __getattr__(self, name):
 		return getattr(self.model_impl, name)
